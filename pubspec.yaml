@@ -35,6 +35,26 @@ dependencies:
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
 
+  # State Management
+  flutter_riverpod: ^2.5.1 # หรือเวอร์ชันล่าสุด
+
+  # Database
+  sqflite: ^2.3.3 # หรือเวอร์ชันล่าสุด
+  path: ^1.9.0
+
+  # Secure Storage for PIN
+  flutter_secure_storage: ^9.1.1 # หรือเวอร์ชันล่าสุด
+
+  # Hashing for PIN
+  crypto: ^3.0.3
+
+  # File Sharing & Picking
+  share_plus: ^9.0.0
+  file_picker: ^8.0.3
+
+  # Encryption for Database file
+  encrypt: ^5.0.3
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
