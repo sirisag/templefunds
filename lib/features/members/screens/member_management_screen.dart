@@ -4,6 +4,7 @@ import 'package:templefunds/core/models/user_model.dart';
 import 'package:templefunds/features/auth/providers/auth_provider.dart';
 import 'package:templefunds/features/members/providers/members_provider.dart';
 import 'package:templefunds/features/members/screens/change_pin_screen.dart';
+import 'package:templefunds/features/transactions/screens/member_transactions_screen.dart';
 import 'package:templefunds/features/members/screens/add_edit_member_screen.dart';
 
 class MemberManagementScreen extends ConsumerWidget {
@@ -146,6 +147,31 @@ class MemberManagementScreen extends ConsumerWidget {
           if (members.isEmpty) {
             return const Center(child: Text('ยังไม่มีสมาชิกในระบบ'));
           }
+
+          // Custom sorting: Admin -> Master -> Monk (alphabetical)
+          members.sort((a, b) {
+            int getRoleWeight(String role) {
+              switch (role) {
+                case 'Admin':
+                  return 0;
+                case 'Master':
+                  return 1;
+                case 'Monk':
+                default:
+                  return 2;
+              }
+            }
+
+            final weightA = getRoleWeight(a.role);
+            final weightB = getRoleWeight(b.role);
+
+            if (weightA != weightB) {
+              return weightA.compareTo(weightB);
+            }
+            // If roles are the same, sort by name
+            return a.name.compareTo(b.name);
+          });
+
           return ListView.builder(
             padding:
                 const EdgeInsets.only(top: 8, bottom: 80), // Add padding for FAB
@@ -155,14 +181,32 @@ class MemberManagementScreen extends ConsumerWidget {
               final bool isActive = user.status == 'active';
               final bool isCurrentUser = user.id == loggedInUser?.id;
 
+              IconData getRoleIcon(String role) {
+                switch (role) {
+                  case 'Admin':
+                    return Icons.shield_outlined;
+                  case 'Master':
+                    return Icons.school_outlined;
+                  default:
+                    return Icons.person_outline;
+                }
+              }
+
               return Card(
                 color: isActive ? null : Colors.grey.shade300,
                 margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                 child: ListTile(
+                  onTap: () {
+                    // Navigate to the member's transaction screen when tapped.
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            MemberTransactionsScreen(userId: user.id!),
+                      ),
+                    );
+                  },
                   leading: Icon(
-                    isCurrentUser
-                        ? Icons.account_circle
-                        : Icons.person_outline,
+                    isCurrentUser ? Icons.account_circle : getRoleIcon(user.role),
                     color: isActive
                         ? Theme.of(context).colorScheme.primary
                         : Colors.grey.shade600,
@@ -173,8 +217,7 @@ class MemberManagementScreen extends ConsumerWidget {
                         : '${user.name} (${user.role})',
                     style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
-                  subtitle:
-                      Text('ID1: ${user.userId1}  |  ID2: ${user.userId2}'),
+                  subtitle: Text('ID1: ${user.userId1}'),
                   trailing: PopupMenuButton<String>(
                     onSelected: (value) {
                       if (value == 'reset_id2') {
@@ -192,6 +235,15 @@ class MemberManagementScreen extends ConsumerWidget {
                     },
                     itemBuilder: (BuildContext context) =>
                         <PopupMenuEntry<String>>[
+                      PopupMenuItem<String>(
+                        enabled: false,
+                        child: ListTile(
+                          leading: const Icon(Icons.lock_outline),
+                          title: Text('ID2: ${user.userId2}'),
+                          dense: true,
+                        ),
+                      ),
+                      const PopupMenuDivider(),
                       const PopupMenuItem<String>(
                         value: 'reset_id2',
                         child: ListTile(

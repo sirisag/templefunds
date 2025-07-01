@@ -4,6 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 import 'package:sqflite/sqflite.dart';
 import '../providers/auth_provider.dart';
+import '../../members/providers/members_provider.dart';
+import '../../transactions/providers/accounts_provider.dart';
+import '../../transactions/providers/transactions_provider.dart';
 
 class WelcomeScreen extends ConsumerStatefulWidget {
   const WelcomeScreen({super.key});
@@ -121,6 +124,11 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
 
     if (confirmed == true && mounted) {
       await ref.read(authProvider.notifier).resetApp();
+      // Invalidate all major data providers to force a full refresh
+      ref.invalidate(membersProvider);
+      ref.invalidate(transactionsProvider);
+      ref.invalidate(allAccountsProvider);
+
       // After resetting, we should also check the DB status again to update the UI
       await _checkDbStatus();
 

@@ -1,17 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:intl/date_symbol_data_local.dart';
+import 'package:month_year_picker/month_year_picker.dart';
 import 'package:templefunds/features/auth/providers/auth_provider.dart';
 import 'package:templefunds/features/auth/screens/welcome_screen.dart';
 import 'package:templefunds/features/auth/screens/admin_registration_screen.dart';
 import 'package:templefunds/features/auth/screens/id2_verification_screen.dart';
 import 'package:templefunds/features/auth/screens/pin_screen.dart';
+import 'package:templefunds/features/home/screens/admin_home_screen.dart';
 import 'package:templefunds/features/home/screens/master_home_screen.dart';
 import 'package:templefunds/features/home/screens/member_home_screen.dart';
-import 'package:templefunds/features/home/screens/admin_home_screen.dart';
 
-void main() {
+void main() async {
   // Ensure that widgets are initialized before running the app.
   WidgetsFlutterBinding.ensureInitialized();
+  // Initialize date formatting for all locales, especially for Thai ('th').
+  await initializeDateFormatting();
   runApp(const ProviderScope(child: MyApp()));
 }
 
@@ -26,6 +31,16 @@ class MyApp extends ConsumerWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
       ),
+      // Add localization support for month_year_picker and general date formatting
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+        MonthYearPickerLocalizations.delegate,
+      ],
+      supportedLocales: const [
+        Locale('th'), // Your primary locale
+      ],
       home: const AuthWrapper(),
     );
   }

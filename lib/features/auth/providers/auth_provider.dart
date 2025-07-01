@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:math';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/models/account_model.dart';
 import '../../../core/database/database_helper.dart';
 import '../../../core/models/user_model.dart';
 import '../../../core/services/secure_storage_service.dart';
@@ -26,22 +27,26 @@ class AuthState {
   final AuthStatus status;
   final User? user; // The user object when logged in or partially identified
   final String? errorMessage;
+  final DateTime? lastDbExport;
 
   AuthState({
     this.status = AuthStatus.initializing,
     this.user,
     this.errorMessage,
+    this.lastDbExport,
   });
 
   AuthState copyWith({
     AuthStatus? status,
     User? user,
     String? errorMessage,
+    DateTime? lastDbExport,
   }) {
     return AuthState(
       status: status ?? this.status,
       user: user ?? this.user,
       errorMessage: errorMessage, // Allow clearing the error message
+      lastDbExport: lastDbExport ?? this.lastDbExport,
     );
   }
 }
@@ -58,19 +63,24 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Future<void> _init() async {
     try {
       final lastUserId = await _secureStorage.getLastUserId();
+      final lastDbExport = await _secureStorage.getLastDbExportTimestamp();
       // A PIN is considered set if we have a last user ID.
       if (lastUserId != null) {
         final user = await _dbHelper.getUserById(lastUserId);
         if (user != null) {
           // User is recognized, go straight to the PIN screen
-          state = state.copyWith(status: AuthStatus.requiresPin, user: user);
+          state = state.copyWith(
+              status: AuthStatus.requiresPin,
+              user: user,
+              lastDbExport: lastDbExport);
         } else {
           // Data inconsistency (e.g., new DB imported), force full logout
           await logout();
         }
       } else {
         // No user saved, normal logged-out state
-        state = state.copyWith(status: AuthStatus.loggedOut);
+        state =
+            state.copyWith(status: AuthStatus.loggedOut, lastDbExport: lastDbExport);
       }
     } catch (e) {
       // Error during init, default to logged out
@@ -157,7 +167,15 @@ class AuthNotifier extends StateNotifier<AuthState> {
       );
 
       // This will create the DB and the user, and return the new ID
-      final newId = await _dbHelper.addUser(adminUser);
+      final newId = await _dbHelper.addUser(adminUser); // This creates the user table
+
+      // Also create the central temple account
+      final templeAccount = Account(
+        name: 'กองกลางวัด',
+        ownerUserId: null, // No specific owner
+        createdAt: DateTime.now(),
+      );
+      await _dbHelper.addAccount(templeAccount);
 
       // Update the user object with the ID from the database
       adminUser = adminUser.copyWith(id: newId);
@@ -223,6 +241,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
         [xfile],
         text: 'ไฟล์ข้อมูลแอปบันทึกปัจจัยวัด ณ ${DateTime.now().toLocal()}',
       );
+
+      // On success, save the timestamp
+      final now = DateTime.now();
+      await _secureStorage.saveLastDbExportTimestamp(now);
+      state = state.copyWith(lastDbExport: now); // Update state
     } catch (e) {
       // Rethrow the exception to be caught by the UI layer
       throw Exception('ส่งออกไฟล์ไม่สำเร็จ: ${e.toString()}');

@@ -48,12 +48,22 @@ dependencies:
   # Hashing for PIN
   crypto: ^3.0.3
 
-  # File Sharing & Picking
+  # File Sharing & Pickingdependencies:
+    # ... other dependencies
+  #intl: ^0.19.0
+  month_year_picker: ^0.5.0+1
+  collection: ^1.19.1
   share_plus: ^9.0.0
   file_picker: ^8.0.3
 
   # Encryption for Database file
   encrypt: ^5.0.3
+
+  # For generating unique IDs
+  uuid: ^4.4.0
+
+  # For animated floating action button menu
+  flutter_speed_dial: ^7.0.0
 
 dev_dependencies:
   flutter_test:

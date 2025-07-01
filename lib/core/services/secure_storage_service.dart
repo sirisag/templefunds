@@ -9,6 +9,7 @@ class SecureStorageService {
   // Define keys for storage to avoid typos.
   static const _pinKey = 'user_pin_hash';
   static const _lastUserIdKey = 'last_user_id';
+  static const _lastDbExportKey = 'last_db_export_timestamp';
 
   /// Hashes a given PIN using SHA-256.
   /// We never store the raw PIN.
@@ -46,9 +47,22 @@ class SecureStorageService {
     return int.tryParse(userIdString);
   }
 
+  /// Saves the timestamp of the last successful DB export.
+  Future<void> saveLastDbExportTimestamp(DateTime timestamp) async {
+    await _storage.write(key: _lastDbExportKey, value: timestamp.toIso8601String());
+  }
+
+  /// Reads the timestamp of the last successful DB export.
+  Future<DateTime?> getLastDbExportTimestamp() async {
+    final timestampString = await _storage.read(key: _lastDbExportKey);
+    if (timestampString == null) return null;
+    return DateTime.tryParse(timestampString);
+  }
+
   /// Deletes all stored authentication data. Useful for logout.
   Future<void> deleteAll() async {
     await _storage.delete(key: _pinKey);
     await _storage.delete(key: _lastUserIdKey);
+    await _storage.delete(key: _lastDbExportKey);
   }
 }

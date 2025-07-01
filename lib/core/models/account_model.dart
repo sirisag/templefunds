@@ -12,6 +12,20 @@ class Account {
     required this.createdAt,
   });
 
+  Account copyWith({
+    int? id,
+    String? name,
+    int? ownerUserId,
+    DateTime? createdAt,
+  }) {
+    return Account(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      ownerUserId: ownerUserId ?? this.ownerUserId,
+      createdAt: createdAt ?? this.createdAt,
+    );
+  }
+
   /// Converts an Account instance into a Map.
   Map<String, dynamic> toMap() {
     return {

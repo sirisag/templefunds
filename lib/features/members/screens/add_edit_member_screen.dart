@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:templefunds/core/models/user_model.dart';
+import 'package:templefunds/features/transactions/providers/accounts_provider.dart';
 import 'package:templefunds/features/members/providers/members_provider.dart';
 
 class AddEditMemberScreen extends ConsumerStatefulWidget {
@@ -120,6 +121,8 @@ class _AddEditMemberScreenState extends ConsumerState<AddEditMemberScreen> {
         createdAt: DateTime.now(),
       );
       await notifier.addUser(newUser);
+      // Invalidate the accounts provider so the list is refreshed on the transaction screen
+      ref.invalidate(allAccountsProvider);
       if (context.mounted) Navigator.of(context).pop();
     } else {
       setState(() => _isLoading = false);

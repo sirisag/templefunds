@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:templefunds/core/widgets/app_dialogs.dart';
 import 'package:templefunds/features/auth/providers/auth_provider.dart';
+import 'package:templefunds/features/members/screens/change_pin_screen.dart';
+import 'package:templefunds/features/transactions/screens/member_transactions_screen.dart';
+import 'package:templefunds/features/transactions/screens/temple_transactions_screen.dart';
 
 class MasterHomeScreen extends ConsumerWidget {
   const MasterHomeScreen({super.key});
@@ -11,34 +15,12 @@ class MasterHomeScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('หน้าหลัก (เจ้าอาวาส)'),
+        title: Text('หน้าหลัก (${user?.role ?? "เจ้าอาวาส"})'),
         actions: [
           IconButton(
             icon: const Icon(Icons.logout),
             tooltip: 'ออกจากระบบ',
-            onPressed: () {
-              // Show a confirmation dialog before logging out
-              showDialog(
-                context: context,
-                builder: (ctx) => AlertDialog(
-                  title: const Text('ยืนยันการออกจากระบบ'),
-                  content: const Text('คุณต้องการออกจากระบบใช่หรือไม่?'),
-                  actions: [
-                    TextButton(
-                      child: const Text('ยกเลิก'),
-                      onPressed: () => Navigator.of(ctx).pop(),
-                    ),
-                    TextButton(
-                      child: const Text('ตกลง'),
-                      onPressed: () {
-                        Navigator.of(ctx).pop();
-                        ref.read(authProvider.notifier).logout();
-                      },
-                    ),
-                  ],
-                ),
-              );
-            },
+            onPressed: () => showLogoutConfirmationDialog(context, ref),
           ),
         ],
       ),
@@ -55,13 +37,37 @@ class MasterHomeScreen extends ConsumerWidget {
               icon: Icons.account_balance_outlined,
               title: 'ดูธุรกรรมของวัด',
               subtitle: 'ดูรายการรับ-จ่ายทั้งหมดของวัด',
-              onTap: () { /* TODO: Navigate to temple transaction list */ }),
+              onTap: () {
+                Navigator.of(context).push(MaterialPageRoute(
+                  builder: (_) => const TempleTransactionsScreen(),
+                ));
+              }),
           const SizedBox(height: 12),
           _buildNavigationTile(context,
               icon: Icons.wallet_outlined,
               title: 'ดูธุรกรรมส่วนตัว',
               subtitle: 'ดูรายการรับ-จ่ายส่วนตัวของคุณ',
-              onTap: () { /* TODO: Navigate to personal transaction list */ }),
+              onTap: () {
+                if (user?.id != null) {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => MemberTransactionsScreen(userId: user!.id!),
+                    ),
+                  );
+                }
+              }),
+          const SizedBox(height: 12),
+          _buildNavigationTile(
+            context,
+            icon: Icons.pin_outlined,
+            title: 'เปลี่ยนรหัส PIN',
+            subtitle: 'เปลี่ยนรหัส PIN 4 หลักสำหรับเข้าใช้งาน',
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const ChangePinScreen()),
+              );
+            },
+          ),
         ],
       ),
     );

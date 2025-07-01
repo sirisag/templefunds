@@ -1,8 +1,9 @@
 import 'package:path/path.dart' as p;
-import 'package:sqflite/sqflite.dart';
+import 'package:sqflite/sqflite.dart' hide Transaction;
 
 import '../models/account_model.dart';
 import '../models/user_model.dart';
+import '../models/transaction_model.dart';
 
 class DatabaseHelper {
   DatabaseHelper._privateConstructor();
@@ -49,7 +50,7 @@ class DatabaseHelper {
   Future<void> _onCreate(Database db, int version) async {
     // Using Batch to execute multiple statements in one go for efficiency.
     final batch = db.batch();
-    await db.execute('''
+    batch.execute('''
       CREATE TABLE users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id_1 TEXT NOT NULL UNIQUE,
@@ -61,7 +62,7 @@ class DatabaseHelper {
       )
     ''');
 
-    await db.execute('''
+    batch.execute('''
       CREATE TABLE accounts (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
@@ -71,7 +72,7 @@ class DatabaseHelper {
       )
     ''');
 
-    await db.execute('''
+    batch.execute('''
       CREATE TABLE transactions (
         id TEXT PRIMARY KEY,
         account_id INTEGER NOT NULL,
@@ -86,13 +87,28 @@ class DatabaseHelper {
       )
     ''');
 
-    await db.execute('''
+    batch.execute('''
       CREATE TABLE app_metadata (
         key TEXT PRIMARY KEY,
         value TEXT NOT NULL
       )
     ''');
     await batch.commit(noResult: true);
+  }
+
+  // --- CRUD Methods for 'accounts' table ---
+
+  /// Inserts a new account.
+  Future<int> addAccount(Account account) async {
+    final db = await instance.database;
+    return await db.insert('accounts', account.toMap());
+  }
+
+  /// Retrieves all accounts from the database.
+  Future<List<Account>> getAllAccounts() async {
+    final db = await instance.database;
+    final maps = await db.query('accounts', orderBy: 'name ASC');
+    return List.generate(maps.length, (i) => Account.fromMap(maps[i]));
   }
 
   // --- Transactional Operations ---
@@ -107,10 +123,25 @@ class DatabaseHelper {
 
       // Step 2: Create the account for this new user.
       // We use the ID returned from the first insert as the owner_user_id.
-      final accountMap = newAccount.toMap();
-      accountMap['owner_user_id'] = newUserId;
+      final accountWithOwner = newAccount.copyWith(ownerUserId: newUserId);
 
-      await txn.insert('accounts', accountMap);
+      await txn.insert('accounts', accountWithOwner.toMap());
+    });
+  }
+
+  /// Adds multiple transactions in a single atomic batch operation.
+  /// This is much more efficient than adding them one by one.
+  Future<void> addMultipleTransactionsInBatch(List<Transaction> transactions) async {
+    final db = await instance.database; // สมมติว่าคุณมี getter 'database'
+    await db.transaction((txn) async {
+      final batch = txn.batch();
+      for (final transaction in transactions) {
+        // สมมติว่าชื่อตารางคือ 'transactions' และ model มีเมธอด toMap()
+        batch.insert('transactions', transaction.toMap(),
+            conflictAlgorithm: ConflictAlgorithm.replace);
+      }
+      // noResult: true จะมีประสิทธิภาพสูงกว่าเล็กน้อย
+      await batch.commit(noResult: true);
     });
   }
 
@@ -207,6 +238,44 @@ class DatabaseHelper {
       where: 'id = ?',
       whereArgs: [id],
     );
+  }
+
+  // --- CRUD Methods for 'transactions' table ---
+
+  /// Inserts a new transaction.
+  Future<void> addTransaction(Transaction transaction) async {
+    final db = await instance.database;
+    await db.insert('transactions', transaction.toMap(),
+        conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  /// Retrieves all transactions, ordered by date descending.
+  Future<List<Transaction>> getAllTransactions() async {
+    final db = await instance.database;
+    final maps = await db.query('transactions', orderBy: 'transaction_date DESC');
+    return List.generate(maps.length, (i) {
+      return Transaction.fromMap(maps[i]);
+    });
+  }
+
+  /// Retrieves transactions for a specific account.
+  Future<List<Transaction>> getTransactionsForAccount(int accountId) async {
+    final db = await instance.database;
+    final maps = await db.query(
+      'transactions',
+      where: 'account_id = ?',
+      whereArgs: [accountId],
+      orderBy: 'transaction_date DESC',
+    );
+    return List.generate(maps.length, (i) {
+      return Transaction.fromMap(maps[i]);
+    });
+  }
+
+  /// Deletes a transaction by its ID (UUID).
+  Future<int> deleteTransaction(String id) async {
+    final db = await instance.database;
+    return await db.delete('transactions', where: 'id = ?', whereArgs: [id]);
   }
 
   /// Closes the database connection.
