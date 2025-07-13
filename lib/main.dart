@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:intl/date_symbol_data_local.dart';
@@ -13,6 +14,7 @@ import 'package:templefunds/features/home/screens/master_home_screen.dart';
 import 'package:templefunds/features/home/screens/member_home_screen.dart';
 
 void main() async {
+  Intl.defaultLocale = 'th';
   // Ensure that widgets are initialized before running the app.
   WidgetsFlutterBinding.ensureInitialized();
   // Initialize date formatting for all locales, especially for Thai ('th').

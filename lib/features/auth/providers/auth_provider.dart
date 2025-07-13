@@ -238,40 +238,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
-  /// Handles the database file export process.
-  Future<void> exportDatabaseFile() async {
-    try {
-      // 1. Get the app's database path
-      final dbDirectoryPath = await getDatabasesPath();
-      final appDbPath = p.join(dbDirectoryPath, 'temple_funds.db');
-      final dbFile = File(appDbPath);
-
-      if (!await dbFile.exists()) {
-        throw Exception('ไม่พบไฟล์ฐานข้อมูลสำหรับส่งออก');
-      }
-
-      // Get temple name for a more descriptive filename
-      final templeName = (await _dbHelper.getAppMetadata('temple_name') ?? 'temple').replaceAll(' ', '_');
-      final timestamp = DateFormat('yyyy-MM-dd_HH-mm').format(DateTime.now());
-      final fileName = 'backup_${templeName}_$timestamp.db';
-
-      // 2. Use share_plus to share the file
-      final xfile = XFile(appDbPath, name: fileName);
-      await Share.shareXFiles(
-        [xfile],
-        text: 'ไฟล์ข้อมูลแอปบันทึกปัจจัยวัด ($templeName) ณ ${DateTime.now().toLocal()}',
-      );
-
-      // On success, save the timestamp
-      final now = DateTime.now();
-      await _secureStorage.saveLastDbExportTimestamp(now);
-      state = state.copyWith(lastDbExport: now); // Update state
-    } catch (e) {
-      // Rethrow the exception to be caught by the UI layer
-      throw Exception('ส่งออกไฟล์ไม่สำเร็จ: ${e.toString()}');
-    }
-  }
-
   /// Changes the user's PIN.
   Future<void> changePin(String oldPin, String newPin) async {
     if (state.user?.id == null) {
@@ -292,6 +258,12 @@ class AuthNotifier extends StateNotifier<AuthState> {
     await _secureStorage.deleteAll();
     await _dbHelper.deleteDatabaseFile();
     state = AuthState(status: AuthStatus.loggedOut); // Reset to a clean loggedOut state
+  }
+
+  /// Saves the timestamp of the last successful DB export.
+  Future<void> saveLastDbExportTimestamp(DateTime timestamp) async {
+    await _secureStorage.saveLastDbExportTimestamp(timestamp);
+    state = state.copyWith(lastDbExport: timestamp); // Update state
   }
 
   Future<void> logout() async {

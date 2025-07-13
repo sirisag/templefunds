@@ -1,4 +1,3 @@
-import 'dart:typed_data';
 
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
@@ -227,7 +226,7 @@ class PdfExportService {
         4: pw.Alignment.centerRight,
       },
       data: transactions.map((t) {
-        final date = DateFormat('dd/MM/yy (HH:mm)', 'th').format(t.transactionDate.toLocal());
+        final date = DateFormat('dd/MM/yyyy (HH:mm)', 'th').format(t.transactionDate.toLocal());
         final income = t.type == 'income' ? currencyFormat.format(t.amount) : '';
         final expense = t.type == 'expense' ? currencyFormat.format(t.amount) : '';
         

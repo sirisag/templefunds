@@ -61,7 +61,7 @@ class TransactionListScreen extends ConsumerWidget {
                   ),
                   title: Text(transaction.description ?? 'ไม่มีคำอธิบาย'),
                   subtitle: Text(
-                    DateFormat('d MMM yyyy, HH:mm')
+                    DateFormat('d MMM yyyy, HH:mm', 'th')
                         .format(transaction.transactionDate.toLocal()),
                   ),
                   trailing: Row(
@@ -92,9 +92,9 @@ class TransactionListScreen extends ConsumerWidget {
                                 ),
                                 TextButton(
                                   onPressed: () => Navigator.of(ctx).pop(true),
-                                  child: const Text('ลบ'),
                                   style: TextButton.styleFrom(
                                       foregroundColor: Colors.red),
+                                  child: const Text('ลบ'),
                                 ),
                               ],
                             ),

@@ -8,6 +8,7 @@ import 'package:templefunds/core/models/user_model.dart';
 import 'package:templefunds/core/widgets/app_dialogs.dart';
 import 'package:templefunds/core/widgets/navigation_tile.dart';
 import 'package:templefunds/features/auth/providers/auth_provider.dart';
+import 'package:templefunds/core/services/db_export_service.dart';
 import 'package:templefunds/features/members/screens/member_management_screen.dart';
 import 'package:templefunds/features/members/providers/members_provider.dart';
 import 'package:templefunds/features/settings/providers/settings_provider.dart';
@@ -44,7 +45,8 @@ class AdminHomeScreen extends ConsumerWidget {
 
     if (confirmed == true) {
       try {
-        await ref.read(authProvider.notifier).exportDatabaseFile();
+        final success = await ref.read(dbExportServiceProvider).exportDatabaseFile();
+        _showExportResultSnackBar(context, success);
       } catch (e) {
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -56,6 +58,16 @@ class AdminHomeScreen extends ConsumerWidget {
         }
       }
     }
+  }
+
+  void _showExportResultSnackBar(BuildContext context, bool success) {
+    final message = success
+        ? 'ส่งออกข้อมูลสำเร็จ'
+        : 'ส่งออกข้อมูลไม่สำเร็จ';
+    final backgroundColor = success ? Colors.green : Theme.of(context).colorScheme.error;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: backgroundColor),
+    );
   }
 
   @override
@@ -197,7 +209,7 @@ class AdminHomeScreen extends ConsumerWidget {
                     Padding(
                       padding: const EdgeInsets.only(right: 16),
                       child: Text(
-                        'สำรองล่าสุด:\n${DateFormat('(HH:mm) dd/MM/yy', 'th').format(lastExportDate.toLocal())}',
+                        'สำรองล่าสุด:\n${DateFormat('(HH:mm) dd/MM/yyyy', 'th').format(lastExportDate.toLocal())}',
                         textAlign: TextAlign.right,
                         style: TextStyle(
                           fontSize: 12,
@@ -358,7 +370,7 @@ class AdminHomeScreen extends ConsumerWidget {
                     const TextSpan(text: 'ไม่พบบัญชี'),
                   TextSpan(
                       text:
-                          ' ${DateFormat('(HH:mm) dd/MM/yy', 'th').format(transaction.transactionDate.toLocal())}'),
+                          ' ${DateFormat('(HH:mm) dd/MM/yyyy', 'th').format(transaction.transactionDate.toLocal())}'),
                 ],
               ),
             ),
