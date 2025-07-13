@@ -49,6 +49,11 @@ class MembersNotifier extends StateNotifier<AsyncValue<List<User>>> {
     await loadUsers(); // Refresh the list
   }
 
+  Future<void> updateUserName(int userId, String newName) async {
+    await _dbHelper.updateUserName(userId, newName);
+    await loadUsers(); // Refresh the list
+  }
+
   Future<String> resetId2(int userId) async {
     final newId2 = (1000 + Random().nextInt(9000)).toString();
     await _dbHelper.updateUserId2(userId, newId2);

@@ -228,6 +228,10 @@ class _MemberTransactionsScreenState
           child: Text('เกิดข้อผิดพลาดในการโหลดผู้ใช้: ${allUsersAsync.error}'));
     }
 
+
+
+
+
     final transactions = monthlyTransactionsAsync.requireValue;
     final users = allUsersAsync.requireValue;
     final userMap = {for (var u in users) u.id: u};
@@ -318,7 +322,7 @@ class _MemberTransactionsScreenState
                   style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
                 subtitle: Text(
-                  '${DateFormat('d/MM/yyyy500 (HH:mm น.)').format(transaction.transactionDate.toLocal())} \n[ ผู้บันทึก: $creatorName ]',
+                  '${DateFormat('d/MM/yyyy (HH:mm น.)').format(transaction.transactionDate.toLocal())} \n[ ผู้บันทึก: $creatorName ]',
                 ),
                 trailing: Text(
                   '$amountPrefix฿${NumberFormat("#,##0").format(transaction.amount)}',

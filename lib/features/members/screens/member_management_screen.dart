@@ -10,6 +10,57 @@ import 'package:templefunds/features/members/screens/add_edit_member_screen.dart
 class MemberManagementScreen extends ConsumerWidget {
   const MemberManagementScreen({super.key});
 
+  void _showChangeNameDialog(BuildContext context, WidgetRef ref, User user) async {
+    final nameController = TextEditingController(text: user.name);
+    final formKey = GlobalKey<FormState>();
+
+    final newName = await showDialog<String>(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          title: Text('เปลี่ยนชื่อของ ${user.name}'),
+          content: Form(
+            key: formKey,
+            child: TextFormField(
+              controller: nameController,
+              decoration: const InputDecoration(
+                labelText: 'ชื่อใหม่',
+                border: OutlineInputBorder(),
+              ),
+              validator: (value) {
+                if (value == null || value.trim().isEmpty) {
+                  return 'กรุณากรอกชื่อ';
+                }
+                if (value.trim() == user.name) {
+                  return 'ชื่อใหม่ต้องไม่ซ้ำกับชื่อเดิม';
+                }
+                return null;
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('ยกเลิก'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                if (formKey.currentState!.validate()) {
+                  Navigator.of(ctx).pop(nameController.text.trim());
+                }
+              },
+              child: const Text('บันทึก'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (newName != null && newName != user.name && context.mounted) {
+      await ref.read(membersProvider.notifier).updateUserName(user.id!, newName);
+    }
+  }
+
   void _showResetId2Dialog(
       BuildContext context, WidgetRef ref, User user) async {
     final confirmed = await showDialog<bool>(
@@ -213,15 +264,17 @@ class MemberManagementScreen extends ConsumerWidget {
                   ),
                   title: Text(
                     isCurrentUser
-                        ? '${user.name} (${user.role}) (คุณ)'
-                        : '${user.name} (${user.role})',
+                        ? '${user.name} (คุณ)'
+                        : '${user.name} ',
                     style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
-                  subtitle: Text('ID1: ${user.userId1}'),
+                  subtitle: Text('${user.role} : ${user.userId1}'),
                   trailing: PopupMenuButton<String>(
                     onSelected: (value) {
                       if (value == 'reset_id2') {
                         _showResetId2Dialog(context, ref, user);
+                      } else if (value == 'change_name') {
+                        _showChangeNameDialog(context, ref, user);
                       } else if (value == 'change_role') {
                         _showChangeRoleDialog(context, ref, user);
                       } else if (value == 'toggle_status') {
@@ -249,6 +302,13 @@ class MemberManagementScreen extends ConsumerWidget {
                         child: ListTile(
                           leading: Icon(Icons.vpn_key_outlined),
                           title: Text('รีเซ็ต ID ชุดที่ 2'),
+                        ),
+                      ),
+                      const PopupMenuItem<String>(
+                        value: 'change_name',
+                        child: ListTile(
+                          leading: Icon(Icons.edit_outlined),
+                          title: Text('เปลี่ยนชื่อ'),
                         ),
                       ),
                       if (isCurrentUser)

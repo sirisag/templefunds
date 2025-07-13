@@ -11,6 +11,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:intl/intl.dart';
 import '../../../core/database/database_helper.dart';
+import '../../settings/providers/settings_provider.dart';
 
 // Part 1: Define the possible authentication states
 enum AuthStatus {
@@ -54,10 +55,11 @@ class AuthState {
 
 // Part 3: Create the StateNotifier
 class AuthNotifier extends StateNotifier<AuthState> {
+  final Ref _ref;
   final DatabaseHelper _dbHelper;
   final SecureStorageService _secureStorage;
 
-  AuthNotifier(this._dbHelper, this._secureStorage) : super(AuthState()) {
+  AuthNotifier(this._ref, this._dbHelper, this._secureStorage) : super(AuthState()) {
     _init();
   }
 
@@ -181,6 +183,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
       // Save the temple name to metadata
       await _dbHelper.setAppMetadata('temple_name', templeName);
 
+      // Invalidate the provider so other parts of the app get the new name
+      _ref.invalidate(templeNameProvider);
+
       // Update the user object with the ID from the database
       adminUser = adminUser.copyWith(id: newId);
 
@@ -194,10 +199,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
   /// Handles the database file import process.
   Future<bool> importDatabaseFile() async {
     try {
-      // 1. Pick the file
+      // 1. Pick the file using FileType.any for better compatibility, as some
+      // platforms have issues with custom extensions.
       final result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: ['db'],
+        type: FileType.any,
       );
 
       if (result == null || result.files.single.path == null) {
@@ -206,6 +211,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
       }
 
       final pickedFilePath = result.files.single.path!;
+
+      // 1.1 Manually validate the file extension.
+      if (p.extension(pickedFilePath).toLowerCase() != '.db') {
+        throw Exception('กรุณาเลือกไฟล์ฐานข้อมูล (.db) เท่านั้น');
+      }
 
       // 2. Get the app's database path
       final dbDirectoryPath = await getDatabasesPath();
@@ -218,8 +228,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
       final sourceFile = File(pickedFilePath);
       await sourceFile.copy(appDbPath);
 
-      // 5. Reset the auth state to force the user to log in again with the new DB
-      state = AuthState();
+      // 5. Reset the auth state completely by logging out, which clears
+      //    the PIN and last user ID from secure storage.
+      await logout();
       return true;
     } catch (e) {
       state = state.copyWith(errorMessage: 'นำเข้าไฟล์ไม่สำเร็จ: ${e.toString()}');
@@ -298,5 +309,5 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
 // Part 4: Define the provider itself
 final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
-  return AuthNotifier(DatabaseHelper.instance, SecureStorageService());
+  return AuthNotifier(ref, DatabaseHelper.instance, SecureStorageService());
 });

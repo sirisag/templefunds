@@ -91,13 +91,17 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
 
     final success = await ref.read(authProvider.notifier).importDatabaseFile();
 
-    if (mounted && success) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('นำเข้าไฟล์สำเร็จ! กรุณาเข้าสู่ระบบด้วยรหัสของคุณ'),
-          backgroundColor: Colors.green,
-        ),
-      );
+    if (mounted) {
+      if (success) {
+        // After a successful import, the DB status has changed.
+        await _checkDbStatus(); // Refresh the UI state
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('นำเข้าไฟล์สำเร็จ! กรุณาเข้าสู่ระบบด้วยรหัสของคุณ'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
     }
   }
 

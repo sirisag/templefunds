@@ -252,6 +252,13 @@ class DatabaseHelper {
         .update('users', {'role': newRole}, where: 'id = ?', whereArgs: [id]);
   }
 
+  /// Updates only the name of a specific user.
+  Future<int> updateUserName(int id, String newName) async {
+    final db = await instance.database;
+    return await db
+        .update('users', {'name': newName}, where: 'id = ?', whereArgs: [id]);
+  }
+
   /// Updates only the user_id_2 of a specific user.
   Future<int> updateUserId2(int id, String newId2) async {
     final db = await instance.database;
