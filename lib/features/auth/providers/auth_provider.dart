@@ -3,13 +3,14 @@ import 'dart:math';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/models/account_model.dart';
-import '../../../core/database/database_helper.dart';
 import '../../../core/models/user_model.dart';
 import '../../../core/services/secure_storage_service.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:path/path.dart' as p;
 import 'package:share_plus/share_plus.dart';
 import 'package:sqflite/sqflite.dart';
+import 'package:intl/intl.dart';
+import '../../../core/database/database_helper.dart';
 
 // Part 1: Define the possible authentication states
 enum AuthStatus {
@@ -150,7 +151,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   /// Completes the registration for a new Admin.
-  Future<void> completeAdminRegistration(String name) async {
+  Future<void> completeAdminRegistration(String name, String templeName) async {
     if (state.user == null || state.status != AuthStatus.requiresAdminRegistration) return;
 
     try {
@@ -176,6 +177,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
         createdAt: DateTime.now(),
       );
       await _dbHelper.addAccount(templeAccount);
+
+      // Save the temple name to metadata
+      await _dbHelper.setAppMetadata('temple_name', templeName);
 
       // Update the user object with the ID from the database
       adminUser = adminUser.copyWith(id: newId);
@@ -235,11 +239,16 @@ class AuthNotifier extends StateNotifier<AuthState> {
         throw Exception('ไม่พบไฟล์ฐานข้อมูลสำหรับส่งออก');
       }
 
+      // Get temple name for a more descriptive filename
+      final templeName = (await _dbHelper.getAppMetadata('temple_name') ?? 'temple').replaceAll(' ', '_');
+      final timestamp = DateFormat('yyyy-MM-dd_HH-mm').format(DateTime.now());
+      final fileName = 'backup_${templeName}_$timestamp.db';
+
       // 2. Use share_plus to share the file
-      final xfile = XFile(appDbPath, name: 'temple_funds_backup.db');
+      final xfile = XFile(appDbPath, name: fileName);
       await Share.shareXFiles(
         [xfile],
-        text: 'ไฟล์ข้อมูลแอปบันทึกปัจจัยวัด ณ ${DateTime.now().toLocal()}',
+        text: 'ไฟล์ข้อมูลแอปบันทึกปัจจัยวัด ($templeName) ณ ${DateTime.now().toLocal()}',
       );
 
       // On success, save the timestamp

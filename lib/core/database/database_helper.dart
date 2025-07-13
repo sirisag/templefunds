@@ -96,6 +96,29 @@ class DatabaseHelper {
     await batch.commit(noResult: true);
   }
 
+  // --- CRUD Methods for 'app_metadata' table ---
+
+  /// Sets a key-value pair in the metadata table.
+  Future<void> setAppMetadata(String key, String value) async {
+    final db = await instance.database;
+    await db.insert(
+      'app_metadata',
+      {'key': key, 'value': value},
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  /// Retrieves a value from the metadata table by its key.
+  Future<String?> getAppMetadata(String key) async {
+    final db = await instance.database;
+    final result =
+        await db.query('app_metadata', where: 'key = ?', whereArgs: [key], limit: 1);
+    if (result.isNotEmpty) {
+      return result.first['value'] as String?;
+    }
+    return null;
+  }
+
   // --- CRUD Methods for 'accounts' table ---
 
   /// Inserts a new account.

@@ -13,12 +13,14 @@ class AdminRegistrationScreen extends ConsumerStatefulWidget {
 class _AdminRegistrationScreenState
     extends ConsumerState<AdminRegistrationScreen> {
   final _nameController = TextEditingController();
+  final _templeNameController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
   bool _isLoading = false;
 
   @override
   void dispose() {
     _nameController.dispose();
+    _templeNameController.dispose();
     super.dispose();
   }
 
@@ -33,7 +35,8 @@ class _AdminRegistrationScreenState
 
     await ref
         .read(authProvider.notifier)
-        .completeAdminRegistration(_nameController.text.trim());
+        .completeAdminRegistration(
+            _nameController.text.trim(), _templeNameController.text.trim());
 
     // Navigation is handled by AuthWrapper, no need to do anything here.
     // Just handle the loading state.
@@ -73,9 +76,24 @@ class _AdminRegistrationScreenState
                 ),
                 const SizedBox(height: 32),
                 TextFormField(
+                  controller: _templeNameController,
+                  decoration: const InputDecoration(
+                    labelText: 'ชื่อวัด',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.account_balance_outlined),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'กรุณากรอกชื่อวัด';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
                   controller: _nameController,
                   decoration: const InputDecoration(
-                    labelText: 'ชื่อ-สกุล หรือ ฉายา',
+                    labelText: 'ชื่อของไวยาวัจกรณ์',
                     border: OutlineInputBorder(),
                     prefixIcon: Icon(Icons.badge_outlined),
                   ),

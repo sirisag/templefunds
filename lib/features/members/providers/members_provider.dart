@@ -23,17 +23,18 @@ class MembersNotifier extends StateNotifier<AsyncValue<List<User>>> {
   }
 
   Future<void> addUser(User user) async {
-    // When adding a new user (Monk/Master), we must also create a
-    // corresponding personal account for them in a single transaction.
-    final newAccount = Account(
-      name: 'ปัจจัยส่วนตัว ${user.name}',
-      // ownerUserId will be set inside the transaction in the helper
-      createdAt: DateTime.now(),
-    );
-
-    // Use the transactional method to ensure both are created or neither.
-    await _dbHelper.createNewMemberWithAccount(user, newAccount);
-
+    // If the new user is an Admin, they don't get a personal account.
+    if (user.role == 'Admin') {
+      await _dbHelper.addUser(user);
+    } else {
+      // When adding a new user (Monk/Master), we must also create a
+      // corresponding personal account for them in a single transaction.
+      final newAccount = Account(
+        name: 'ปัจจัยส่วนตัว ${user.name}',
+        createdAt: DateTime.now(),
+      );
+      await _dbHelper.createNewMemberWithAccount(user, newAccount);
+    }
     await loadUsers(); // Refresh the list to reflect the new user
   }
 

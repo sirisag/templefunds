@@ -6,11 +6,15 @@ import 'package:month_year_picker/month_year_picker.dart';
 import 'package:templefunds/core/models/account_model.dart';
 import 'package:templefunds/core/models/transaction_model.dart';
 import 'package:templefunds/core/models/user_model.dart';
+import 'package:templefunds/core/services/pdf_export_service.dart';
+import 'package:templefunds/features/auth/providers/auth_provider.dart';
 import 'package:templefunds/features/members/providers/members_provider.dart';
+import 'package:templefunds/features/settings/providers/settings_provider.dart';
 import 'package:templefunds/features/transactions/providers/accounts_provider.dart';
 import 'package:templefunds/features/transactions/providers/transactions_provider.dart';
 import 'package:templefunds/features/transactions/screens/add_single_transaction_screen.dart';
 import 'package:templefunds/features/transactions/screens/temple_transactions_screen.dart';
+import 'package:printing/printing.dart';
 
 class MemberTransactionsScreen extends ConsumerStatefulWidget {
   final int userId;
@@ -67,6 +71,53 @@ class _MemberTransactionsScreenState
     return _selectedMonth.year == now.year && _selectedMonth.month == now.month;
   }
 
+  Future<void> _exportToPdf(
+    BuildContext context,
+    String templeName,
+    User memberUser,
+    User? adminUser,
+    List<Transaction> transactions,
+    double totalBalance,
+  ) async {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('กำลังสร้างไฟล์ PDF...')),
+    );
+
+    try {
+      final pdfService = PdfExportService();
+
+      final monthlyIncome = transactions
+          .where((t) => t.type == 'income')
+          .fold(0.0, (sum, t) => sum + t.amount);
+      final monthlyExpense = transactions
+          .where((t) => t.type == 'expense')
+          .fold(0.0, (sum, t) => sum + t.amount);
+
+      final pdfData = await pdfService.generateMemberMonthlyReport(
+        templeName: templeName,
+        memberUser: memberUser,
+        adminUser: adminUser,
+        month: _selectedMonth,
+        transactions: transactions,
+        monthlyIncome: monthlyIncome,
+        monthlyExpense: monthlyExpense,
+        totalBalance: totalBalance,
+      );
+
+      await Printing.layoutPdf(
+        onLayout: (format) async => pdfData,
+        name:
+            'report_${memberUser.name.replaceAll(' ', '_')}_${DateFormat('yyyy-MM').format(_selectedMonth)}.pdf',
+      );
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('เกิดข้อผิดพลาดในการสร้าง PDF: $e')),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final userAsync = ref.watch(memberByIdProvider(widget.userId));
@@ -90,6 +141,44 @@ class _MemberTransactionsScreenState
         return Scaffold(
           appBar: AppBar(
             title: Text('บัญชี: ${user.name} (id:${user.userId1})'),
+            actions: [
+              if (account != null)
+                IconButton(
+                  icon: const Icon(Icons.picture_as_pdf_outlined),
+                  tooltip: 'ส่งออกเป็น PDF',
+                  onPressed: () {
+                    final templeName =
+                        ref.read(templeNameProvider).asData?.value;
+                    final transactions = ref
+                        .read(monthlyTransactionsProvider(
+                            (accountId: account.id!, month: _selectedMonth)))
+                        .asData
+                        ?.value;
+                    final totalBalance =
+                        ref.read(filteredBalanceProvider(account.id!));
+                    final adminUser = ref.read(authProvider).user;
+
+                    if (transactions != null &&
+                        transactions.isNotEmpty &&
+                        templeName != null) {
+                      // Sort transactions for the report
+                      final sortedTransactions =
+                          List<Transaction>.from(transactions);
+                      sortedTransactions.sort((a, b) =>
+                          a.transactionDate.compareTo(b.transactionDate));
+
+                      _exportToPdf(context, templeName, user, adminUser,
+                          sortedTransactions, totalBalance);
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                            content:
+                                Text('ไม่สามารถส่งออกได้เนื่องจากข้อมูลยังไม่พร้อม')),
+                      );
+                    }
+                  },
+                ),
+            ],
           ),
           body: account == null
               ? accountsAsync.when(

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:templefunds/core/widgets/app_dialogs.dart';
 import 'package:templefunds/core/widgets/navigation_tile.dart';
+import 'package:templefunds/core/services/report_generation_service.dart';
 import 'package:templefunds/features/auth/providers/auth_provider.dart';
 import 'package:templefunds/features/members/screens/change_pin_screen.dart';
 import 'package:templefunds/features/transactions/screens/member_transactions_screen.dart';
@@ -9,6 +10,27 @@ import 'package:templefunds/features/transactions/screens/temple_transactions_sc
 
 class MasterHomeScreen extends ConsumerWidget {
   const MasterHomeScreen({super.key});
+
+  Future<void> _exportReport(
+    BuildContext context,
+    WidgetRef ref, {
+    required bool isTempleReport,
+  }) async {
+    final reportService = ref.read(reportGenerationServiceProvider);
+    final selectedMonth = await reportService.pickMonth(context);
+
+    if (selectedMonth != null && context.mounted) {
+      if (isTempleReport) {
+        await reportService.generateAndShowTempleReport(context, selectedMonth);
+      } else {
+        final user = ref.read(authProvider).user;
+        if (user?.id != null) {
+          await reportService.generateAndShowMemberReport(
+              context, selectedMonth, user!.id!);
+        }
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -57,6 +79,20 @@ class MasterHomeScreen extends ConsumerWidget {
                   );
                 }
               }),
+          const SizedBox(height: 12),
+                    NavigationTile(
+            icon: Icons.picture_as_pdf_outlined,
+            title: 'ส่งออกรายงานวัด',
+            subtitle: 'สร้างรายงาน PDF ของบัญชีวัด (เลือกเดือน)',
+            onTap: () => _exportReport(context, ref, isTempleReport: true),
+          ),
+          const SizedBox(height: 12),
+          NavigationTile(
+            icon: Icons.person_search_outlined,
+            title: 'ส่งออกรายงานส่วนตัว',
+            subtitle: 'สร้างรายงาน PDF ของบัญชีส่วนตัว (เลือกเดือน)',
+            onTap: () => _exportReport(context, ref, isTempleReport: false),
+          ),
           const SizedBox(height: 12),
           NavigationTile(
             icon: Icons.pin_outlined,

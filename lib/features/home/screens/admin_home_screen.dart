@@ -10,6 +10,7 @@ import 'package:templefunds/core/widgets/navigation_tile.dart';
 import 'package:templefunds/features/auth/providers/auth_provider.dart';
 import 'package:templefunds/features/members/screens/member_management_screen.dart';
 import 'package:templefunds/features/members/providers/members_provider.dart';
+import 'package:templefunds/features/settings/providers/settings_provider.dart';
 import 'package:templefunds/features/transactions/providers/accounts_provider.dart';
 import 'package:templefunds/features/transactions/providers/balance_provider.dart';
 import 'package:templefunds/features/transactions/providers/transactions_provider.dart';
@@ -66,10 +67,28 @@ class AdminHomeScreen extends ConsumerWidget {
     final transactionsAsync = ref.watch(transactionsProvider);
     final accountsAsync = ref.watch(allAccountsProvider);
     final membersAsync = ref.watch(membersProvider);
+    final templeNameAsync = ref.watch(templeNameProvider);
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('หน้าหลัก (${user?.role ?? "ผู้ดูแล"})'),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            templeNameAsync.when(
+              data: (name) => Text(
+                name ?? 'หน้าหลัก',
+                style:
+                    const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+              ),
+              loading: () => const Text('กำลังโหลด...', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              error: (e, s) => const Text('หน้าหลัก', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            ),
+            Text(
+              'ไวยาวัจกรณ์: ${user?.name ?? ''} (ID: ${user?.userId1 ?? ''})',
+              style: TextStyle(fontSize: 14, color: const Color.fromARGB(255, 20, 20, 20).withOpacity(0.9)),
+            ),
+          ],
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.logout),
@@ -338,7 +357,7 @@ class AdminHomeScreen extends ConsumerWidget {
                   else
                     const TextSpan(text: 'ไม่พบบัญชี'),
                   TextSpan(
-                      text: ' • ${DateFormat('(HH:mm) dd/MM/yy')
+                      text: ' ${DateFormat('(HH:mm) dd/MM/yy')
                           .format(transaction.transactionDate.toLocal())}'),
                 ],
               ),

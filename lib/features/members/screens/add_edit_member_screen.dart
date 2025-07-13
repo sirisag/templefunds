@@ -164,6 +164,7 @@ class _AddEditMemberScreenState extends ConsumerState<AddEditMemberScreen> {
                 items: const [
                   DropdownMenuItem(value: 'Monk', child: Text('พระลูกวัด')),
                   DropdownMenuItem(value: 'Master', child: Text('เจ้าอาวาส')),
+                  DropdownMenuItem(value: 'Admin', child: Text('ไวยาวัจกรณ์')),
                 ],
                 onChanged: (value) {
                   if (value != null) setState(() => _selectedRole = value);

@@ -6,6 +6,7 @@ import 'package:sqflite/sqflite.dart';
 import '../providers/auth_provider.dart';
 import '../../members/providers/members_provider.dart';
 import '../../transactions/providers/accounts_provider.dart';
+import '../../settings/providers/settings_provider.dart';
 import '../../transactions/providers/transactions_provider.dart';
 
 class WelcomeScreen extends ConsumerStatefulWidget {
@@ -158,6 +159,7 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
         ref.read(authProvider.notifier).clearError();
       }
     });
+    final templeNameAsync = ref.watch(templeNameProvider);
 
     return Scaffold(
       body: SafeArea(
@@ -183,6 +185,26 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
                               style: Theme.of(context).textTheme.headlineMedium),
                           Text('บันทึกรายการบัญชีวัด',
                               style: Theme.of(context).textTheme.headlineMedium),
+                          templeNameAsync.when(
+                            data: (name) => (name != null && name.isNotEmpty)
+                                ? Padding(
+                                    padding: const EdgeInsets.only(top: 8.0),
+                                    child: Text(
+                                      name,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .titleLarge
+                                          ?.copyWith(
+                                              color: Theme.of(context)
+                                                  .colorScheme
+                                                  .secondary),
+                                      textAlign: TextAlign.center,
+                                    ),
+                                  )
+                                : const SizedBox.shrink(),
+                            loading: () => const SizedBox.shrink(),
+                            error: (e, s) => const SizedBox.shrink(),
+                          ),
                           const SizedBox(height: 40),
                           TextFormField(
                             controller: _idController,
