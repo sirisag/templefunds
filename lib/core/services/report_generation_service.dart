@@ -4,9 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:month_year_picker/month_year_picker.dart';
 import 'package:printing/printing.dart';
-import 'package:templefunds/core/models/account_model.dart';
+//import 'package:templefunds/core/models/account_model.dart';
 import 'package:templefunds/core/models/transaction_model.dart';
-import 'package:templefunds/core/models/user_model.dart';
+//import 'package:templefunds/core/models/user_model.dart';
 import 'package:templefunds/core/services/pdf_export_service.dart';
 import 'package:templefunds/features/auth/providers/auth_provider.dart';
 import 'package:templefunds/features/members/providers/members_provider.dart';
@@ -55,8 +55,10 @@ class ReportGenerationService {
       // 2. Filter and calculate data for the selected month
       final monthlyTransactions = _getMonthlyTransactions(
           allTransactions, templeAccount.id!, month);
-      
-      final totalBalance = _calculateTotalBalance(allTransactions, templeAccount.id!);
+
+      // Calculate the balance at the START of the selected month.
+      final firstDayOfSelectedMonth = DateTime(month.year, month.month, 1);
+      final startingBalance = _calculateBalanceUpTo(allTransactions, templeAccount.id!, firstDayOfSelectedMonth);
       
       final monthlyIncome = monthlyTransactions
           .where((t) => t.type == 'income')
@@ -64,6 +66,9 @@ class ReportGenerationService {
       final monthlyExpense = monthlyTransactions
           .where((t) => t.type == 'expense')
           .fold(0.0, (sum, t) => sum + t.amount);
+      
+      // The ending balance is the starting balance plus the net of the month's transactions.
+      final endingBalance = startingBalance + monthlyIncome - monthlyExpense;
 
       final masterUser = allMembers.firstWhereOrNull((u) => u.role == 'Master');
 
@@ -78,7 +83,8 @@ class ReportGenerationService {
         transactions: monthlyTransactions,
         monthlyIncome: monthlyIncome,
         monthlyExpense: monthlyExpense,
-        totalBalance: totalBalance,
+        totalBalance: endingBalance, // This is the final balance for the summary
+        startingBalance: startingBalance,
       );
 
       // 4. Show print preview
@@ -119,8 +125,10 @@ class ReportGenerationService {
       // 2. Filter and calculate
       final monthlyTransactions = _getMonthlyTransactions(
           allTransactions, memberAccount.id!, month);
-          
-      final totalBalance = _calculateTotalBalance(allTransactions, memberAccount.id!);
+
+      // Calculate the balance at the START of the selected month.
+      final firstDayOfSelectedMonth = DateTime(month.year, month.month, 1);
+      final startingBalance = _calculateBalanceUpTo(allTransactions, memberAccount.id!, firstDayOfSelectedMonth);
 
       final monthlyIncome = monthlyTransactions
           .where((t) => t.type == 'income')
@@ -128,6 +136,9 @@ class ReportGenerationService {
       final monthlyExpense = monthlyTransactions
           .where((t) => t.type == 'expense')
           .fold(0.0, (sum, t) => sum + t.amount);
+      
+      // The ending balance is the starting balance plus the net of the month's transactions.
+      final endingBalance = startingBalance + monthlyIncome - monthlyExpense;
 
       // 3. Generate PDF
       final pdfService = PdfExportService();
@@ -139,7 +150,8 @@ class ReportGenerationService {
         transactions: monthlyTransactions,
         monthlyIncome: monthlyIncome,
         monthlyExpense: monthlyExpense,
-        totalBalance: totalBalance,
+        totalBalance: endingBalance,
+        startingBalance: startingBalance,
       );
 
       // 4. Show print preview
@@ -168,9 +180,10 @@ class ReportGenerationService {
     return filtered;
   }
 
-  double _calculateTotalBalance(List<Transaction> all, int accountId) {
+  double _calculateBalanceUpTo(
+      List<Transaction> all, int accountId, DateTime beforeDate) {
     return all
-        .where((t) => t.accountId == accountId)
+        .where((t) => t.accountId == accountId && t.transactionDate.isBefore(beforeDate))
         .fold(0.0, (sum, t) => sum + (t.type == 'income' ? t.amount : -t.amount));
   }
 

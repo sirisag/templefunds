@@ -6,7 +6,7 @@ import 'package:intl/intl.dart';
 import 'package:templefunds/core/models/account_model.dart';
 import 'package:templefunds/core/models/transaction_model.dart';
 import 'package:templefunds/core/models/user_model.dart';
-import 'package:templefunds/core/widgets/app_dialogs.dart';
+//import 'package:templefunds/core/widgets/app_dialogs.dart';
 import 'package:templefunds/features/auth/providers/auth_provider.dart';
 import 'package:templefunds/features/members/providers/members_provider.dart';
 import 'package:templefunds/features/transactions/providers/accounts_provider.dart';
@@ -130,7 +130,7 @@ class _AddMultiTransactionScreenState
     final description = _descriptionController.text.trim();
     final typeText = _transactionType == 'income' ? 'รายรับ' : 'รายจ่าย';
     final dateText =
-        DateFormat('d MMM yyyy, HH:mm').format(_selectedDate.toLocal());
+        DateFormat('d MMM yyyy, HH:mm', 'th').format(_selectedDate.toLocal());
 
     // Get the full account and user objects for the selected IDs
     final allAccounts = ref.read(allAccountsProvider).asData?.value ?? [];
@@ -409,7 +409,7 @@ class _AddMultiTransactionScreenState
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
-              DateFormat('d/MM/yyyy (HH:mm)').format(_selectedDate.toLocal()),
+              DateFormat('d/MM/yyyy (HH:mm)', 'th').format(_selectedDate.toLocal()),
             ),
             const Icon(Icons.calendar_today, color: Colors.grey),
           ],

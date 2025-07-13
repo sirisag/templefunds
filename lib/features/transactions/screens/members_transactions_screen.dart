@@ -2,10 +2,10 @@ import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
-import 'package:month_year_picker/month_year_picker.dart';
-import 'package:templefunds/core/models/account_model.dart';
+//import 'package:month_year_picker/month_year_picker.dart';
+//import 'package:templefunds/core/models/account_model.dart';
 import 'package:templefunds/core/models/transaction_model.dart';
-import 'package:templefunds/core/models/user_model.dart';
+//import 'package:templefunds/core/models/user_model.dart';
 import 'package:templefunds/features/members/providers/members_provider.dart';
 import 'package:templefunds/features/transactions/providers/accounts_provider.dart';
 import 'package:templefunds/features/transactions/providers/transactions_provider.dart';
@@ -251,7 +251,7 @@ class _MembersTransactionsScreenState
                       ),
                       TextSpan(
                         text:
-                            ' (id:${owner?.userId1 ?? ''}) • \n${DateFormat('d/MM/yyyy (HH:mm น.)').format(transaction.transactionDate.toLocal())} \n[ ผู้บันทึก: $creatorName ]',
+                            ' (id:${owner?.userId1 ?? ''}) • \n${DateFormat('d/MM/yyyy (HH:mm น.)', 'th').format(transaction.transactionDate.toLocal())} \n[ ผู้บันทึก: $creatorName ]',
                       ),
                     ],
                   ),

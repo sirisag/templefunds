@@ -18,6 +18,7 @@ class PdfExportService {
     required double monthlyIncome,
     required double monthlyExpense,
     required double totalBalance,
+    required double startingBalance,
   }) async {
     final pdf = pw.Document();
 
@@ -36,7 +37,7 @@ class PdfExportService {
     final monthFormat = DateFormat.yMMMM('th');
 
     // Calculate the balance at the start of the month
-    final startingBalance = totalBalance - (monthlyIncome - monthlyExpense);
+   // final startingBalance = totalBalance - (monthlyIncome - monthlyExpense);
 
     pdf.addPage(
       pw.MultiPage(
@@ -71,6 +72,7 @@ class PdfExportService {
     required double monthlyIncome,
     required double monthlyExpense,
     required double totalBalance,
+    required double startingBalance,
   }) async {
     final pdf = pw.Document();
 
@@ -87,9 +89,6 @@ class PdfExportService {
 
     final currencyFormat = NumberFormat("#,##0.00", "th_TH");
     final monthFormat = DateFormat.yMMMM('th');
-
-    // Calculate the balance at the start of the month
-    final startingBalance = totalBalance - (monthlyIncome - monthlyExpense);
 
     pdf.addPage(
       pw.MultiPage(
@@ -228,7 +227,7 @@ class PdfExportService {
         4: pw.Alignment.centerRight,
       },
       data: transactions.map((t) {
-        final date = DateFormat('dd/MM/yy (HH:mm)').format(t.transactionDate.toLocal());
+        final date = DateFormat('dd/MM/yy (HH:mm)', 'th').format(t.transactionDate.toLocal());
         final income = t.type == 'income' ? currencyFormat.format(t.amount) : '';
         final expense = t.type == 'expense' ? currencyFormat.format(t.amount) : '';
         

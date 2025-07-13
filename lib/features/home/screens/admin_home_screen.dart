@@ -197,7 +197,7 @@ class AdminHomeScreen extends ConsumerWidget {
                     Padding(
                       padding: const EdgeInsets.only(right: 16),
                       child: Text(
-                        'สำรองล่าสุด:\n${DateFormat('(HH:mm) dd/MM/yy').format(lastExportDate.toLocal())}',
+                        'สำรองล่าสุด:\n${DateFormat('(HH:mm) dd/MM/yy', 'th').format(lastExportDate.toLocal())}',
                         textAlign: TextAlign.right,
                         style: TextStyle(
                           fontSize: 12,
@@ -357,8 +357,8 @@ class AdminHomeScreen extends ConsumerWidget {
                   else
                     const TextSpan(text: 'ไม่พบบัญชี'),
                   TextSpan(
-                      text: ' ${DateFormat('(HH:mm) dd/MM/yy')
-                          .format(transaction.transactionDate.toLocal())}'),
+                      text:
+                          ' ${DateFormat('(HH:mm) dd/MM/yy', 'th').format(transaction.transactionDate.toLocal())}'),
                 ],
               ),
             ),

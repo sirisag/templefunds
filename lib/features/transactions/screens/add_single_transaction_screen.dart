@@ -130,7 +130,7 @@ class _AddSingleTransactionScreenState
             Text('จำนวนเงิน: ฿${NumberFormat("#,##0.00").format(amount)}'),
             Text('คำอธิบาย: $description'),
             Text(
-                'วันที่: ${DateFormat('d MMM yyyy, HH:mm').format(_selectedDate.toLocal())}'),
+                'วันที่: ${DateFormat('d MMM yyyy, HH:mm', 'th').format(_selectedDate.toLocal())}'),
           ],
         ),
         actions: [
@@ -274,7 +274,7 @@ class _AddSingleTransactionScreenState
                 const SizedBox(height: 16),
                 ListTile(
                   title: const Text('วันที่ทำรายการ'),
-                  subtitle: Text(DateFormat('d MMMM yyyy, HH:mm')
+                  subtitle: Text(DateFormat('d MMMM yyyy, HH:mm', 'th')
                       .format(_selectedDate.toLocal())),
                   trailing: const Icon(Icons.calendar_today),
                   onTap: _pickDate,

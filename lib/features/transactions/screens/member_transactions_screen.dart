@@ -78,6 +78,7 @@ class _MemberTransactionsScreenState
     User? adminUser,
     List<Transaction> transactions,
     double totalBalance,
+    double startingBalance,
   ) async {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('กำลังสร้างไฟล์ PDF...')),
@@ -102,6 +103,7 @@ class _MemberTransactionsScreenState
         monthlyIncome: monthlyIncome,
         monthlyExpense: monthlyExpense,
         totalBalance: totalBalance,
+        startingBalance: startingBalance,
       );
 
       await Printing.layoutPdf(
@@ -149,26 +151,35 @@ class _MemberTransactionsScreenState
                   onPressed: () {
                     final templeName =
                         ref.read(templeNameProvider).asData?.value;
-                    final transactions = ref
-                        .read(monthlyTransactionsProvider(
-                            (accountId: account.id!, month: _selectedMonth)))
-                        .asData
-                        ?.value;
-                    final totalBalance =
-                        ref.read(filteredBalanceProvider(account.id!));
+                    final allTransactions =
+                        ref.read(transactionsProvider).asData?.value;
                     final adminUser = ref.read(authProvider).user;
 
-                    if (transactions != null &&
-                        transactions.isNotEmpty &&
-                        templeName != null) {
-                      // Sort transactions for the report
-                      final sortedTransactions =
-                          List<Transaction>.from(transactions);
-                      sortedTransactions.sort((a, b) =>
+                    if (allTransactions != null && templeName != null) {
+                      // Filter for monthly transactions
+                      final monthlyTransactions = allTransactions.where((t) {
+                        final transactionDate = t.transactionDate.toLocal();
+                        return t.accountId == account.id! &&
+                            transactionDate.year == _selectedMonth.year &&
+                            transactionDate.month == _selectedMonth.month;
+                      }).toList();
+                      monthlyTransactions.sort((a, b) =>
                           a.transactionDate.compareTo(b.transactionDate));
 
+                      // Calculate starting balance
+                      final firstDayOfSelectedMonth =
+                          DateTime(_selectedMonth.year, _selectedMonth.month, 1);
+                      final startingBalance = allTransactions
+                          .where((t) => t.accountId == account.id! && t.transactionDate.isBefore(firstDayOfSelectedMonth))
+                          .fold(0.0, (sum, t) => sum + (t.type == 'income' ? t.amount : -t.amount));
+
+                      // Calculate ending balance
+                      final monthlyIncome = monthlyTransactions.where((t) => t.type == 'income').fold(0.0, (sum, t) => sum + t.amount);
+                      final monthlyExpense = monthlyTransactions.where((t) => t.type == 'expense').fold(0.0, (sum, t) => sum + t.amount);
+                      final endingBalance = startingBalance + monthlyIncome - monthlyExpense;
+
                       _exportToPdf(context, templeName, user, adminUser,
-                          sortedTransactions, totalBalance);
+                          monthlyTransactions, endingBalance, startingBalance);
                     } else {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
@@ -322,7 +333,7 @@ class _MemberTransactionsScreenState
                   style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
                 subtitle: Text(
-                  '${DateFormat('d/MM/yyyy (HH:mm น.)').format(transaction.transactionDate.toLocal())} \n[ ผู้บันทึก: $creatorName ]',
+                  '${DateFormat('d/MM/yyyy (HH:mm น.)', 'th').format(transaction.transactionDate.toLocal())} \n[ ผู้บันทึก: $creatorName ]',
                 ),
                 trailing: Text(
                   '$amountPrefix฿${NumberFormat("#,##0").format(transaction.amount)}',
