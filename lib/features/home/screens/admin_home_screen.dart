@@ -6,6 +6,7 @@ import 'package:templefunds/core/models/account_model.dart';
 import 'package:templefunds/core/models/transaction_model.dart';
 import 'package:templefunds/core/models/user_model.dart';
 import 'package:templefunds/core/widgets/app_dialogs.dart';
+import 'package:templefunds/core/widgets/navigation_tile.dart';
 import 'package:templefunds/features/auth/providers/auth_provider.dart';
 import 'package:templefunds/features/members/screens/member_management_screen.dart';
 import 'package:templefunds/features/members/providers/members_provider.dart';
@@ -99,8 +100,7 @@ class AdminHomeScreen extends ConsumerWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                _buildNavigationTile(
-                  context,
+                NavigationTile(
                   icon: Icons.account_balance_outlined,
                   title: 'รายการบัญชีวัด',
                   subtitle: 'ดูธุรกรรมทั้งหมดของกองกลางวัด',
@@ -110,8 +110,7 @@ class AdminHomeScreen extends ConsumerWidget {
                   },
                 ),
                 const SizedBox(height:5),
-                _buildNavigationTile(
-                  context,
+                NavigationTile(
                   icon: Icons.wallet_outlined,
                   title: 'รายการบัญชีพระ',
                   subtitle: 'ดูธุรกรรมทั้งหมดของสมาชิก',
@@ -327,14 +326,14 @@ class AdminHomeScreen extends ConsumerWidget {
                       // Member account: "Name:ID2"
                       TextSpan(
                         text: userMap[account.ownerUserId]?.name ?? account.name,
-                        style: const TextStyle(fontWeight: FontWeight.bold),
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                       ),
                       TextSpan(text: ':${userMap[account.ownerUserId]?.userId2 ?? ''}'),
                     ] else
                       // Temple account
                       TextSpan(
                         text: account.name,
-                        style: const TextStyle(fontWeight: FontWeight.bold),
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                       )
                   else
                     const TextSpan(text: 'ไม่พบบัญชี'),
@@ -374,25 +373,6 @@ class AdminHomeScreen extends ConsumerWidget {
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildNavigationTile(
-    BuildContext context, {
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required VoidCallback onTap,
-  }) {
-    return Card(
-      child: ListTile(
-        leading:
-            Icon(icon, size: 40, color: Theme.of(context).colorScheme.primary),
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: Text(subtitle),
-        trailing: const Icon(Icons.chevron_right),
-        onTap: onTap,
-      ),
     );
   }
 }

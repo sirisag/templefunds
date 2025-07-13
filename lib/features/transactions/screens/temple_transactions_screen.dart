@@ -128,6 +128,7 @@ class _TempleTransactionsScreenState
     final monthlyTransactionsAsync =
         ref.watch(monthlyTransactionsProvider(filter));
     final allUsersAsync = ref.watch(membersProvider);
+    final totalBalance = ref.watch(filteredBalanceProvider(templeAccount.id!));
 
     // Handle combined loading/error states first
     if (monthlyTransactionsAsync.isLoading || allUsersAsync.isLoading) {
@@ -157,30 +158,53 @@ class _TempleTransactionsScreenState
       );
     }
 
-    double balance = 0;
+    double monthlyBalance = 0;
     for (final t in transactions) {
-      balance += t.type == 'income' ? t.amount : -t.amount;
+      monthlyBalance += t.type == 'income' ? t.amount : -t.amount;
     }
 
     return Column(
       children: [
         Padding(
           padding: const EdgeInsets.all(16.0),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          child: Column(
             children: [
-              Text(
-                'สรุปยอดเดือนนี้:',
-                style: Theme.of(context).textTheme.titleMedium,
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'สรุปยอดเดือนนี้:',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  Text(
+                    '฿${NumberFormat("#,##0").format(monthlyBalance)}',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: monthlyBalance >= 0
+                              ? Colors.green.shade700
+                              : Colors.red.shade700,
+                        ),
+                  ),
+                ],
               ),
-              Text(
-                '฿${NumberFormat("#,##0").format(balance)}',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: balance >= 0
-                          ? Colors.green.shade700
-                          : Colors.red.shade700,
-                    ),
+              const SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'ยอดคงเหลือทั้งหมด:',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  Text(
+                    '฿${NumberFormat("#,##0").format(totalBalance)}',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: totalBalance >= 0
+                              ? Colors.blue.shade800
+                              : Colors.orange.shade800,
+                        ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -211,7 +235,7 @@ class _TempleTransactionsScreenState
                   style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
                 subtitle: Text(
-                  '${DateFormat('d/MM/yyyy, (HH:mm น.)').format(transaction.transactionDate.toLocal())} \n[ผู้บันทึก: $creatorName]',
+                  '${DateFormat('d/MM/yyyy (HH:mm น.)').format(transaction.transactionDate.toLocal())} \n[ผู้บันทึก: $creatorName]',
                 ),
                 trailing: Text(
                   '$amountPrefix฿${NumberFormat("#,##0").format(transaction.amount)}',

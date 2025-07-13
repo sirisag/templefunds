@@ -8,6 +8,7 @@ import 'package:templefunds/core/models/transaction_model.dart';
 import 'package:templefunds/core/models/user_model.dart';
 import 'package:templefunds/features/members/providers/members_provider.dart';
 import 'package:templefunds/features/transactions/providers/accounts_provider.dart';
+import 'package:templefunds/features/transactions/providers/transactions_provider.dart';
 import 'package:templefunds/features/transactions/screens/add_single_transaction_screen.dart';
 import 'package:templefunds/features/transactions/screens/temple_transactions_screen.dart';
 
@@ -88,7 +89,7 @@ class _MemberTransactionsScreenState
 
         return Scaffold(
           appBar: AppBar(
-            title: Text('บัญชี: ${user.name}'),
+            title: Text('บัญชี: ${user.name} (id:${user.userId1})'),
           ),
           body: account == null
               ? accountsAsync.when(
@@ -122,6 +123,7 @@ class _MemberTransactionsScreenState
     final monthlyTransactionsAsync =
         ref.watch(monthlyTransactionsProvider(filter));
     final allUsersAsync = ref.watch(membersProvider);
+    final totalBalance = ref.watch(filteredBalanceProvider(memberAccount.id!));
 
     if (monthlyTransactionsAsync.isLoading || allUsersAsync.isLoading) {
       return const Center(child: CircularProgressIndicator());
@@ -150,30 +152,53 @@ class _MemberTransactionsScreenState
       );
     }
 
-    double balance = 0;
+    double monthlyBalance = 0;
     for (final t in transactions) {
-      balance += t.type == 'income' ? t.amount : -t.amount;
+      monthlyBalance += t.type == 'income' ? t.amount : -t.amount;
     }
 
     return Column(
       children: [
         Padding(
           padding: const EdgeInsets.all(16.0),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          child: Column(
             children: [
-              Text(
-                'สรุปยอดเดือนนี้:',
-                style: Theme.of(context).textTheme.titleMedium,
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'สรุปยอดเดือนนี้:',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  Text(
+                    '฿${NumberFormat("#,##0").format(monthlyBalance)}',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: monthlyBalance >= 0
+                              ? Colors.green.shade700
+                              : Colors.red.shade700,
+                        ),
+                  ),
+                ],
               ),
-              Text(
-                '฿${NumberFormat("#,##0").format(balance)}',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: balance >= 0
-                          ? Colors.green.shade700
-                          : Colors.red.shade700,
-                    ),
+              const SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'ยอดคงเหลือทั้งหมด:',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  Text(
+                    '฿${NumberFormat("#,##0").format(totalBalance)}',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: totalBalance >= 0
+                              ? Colors.blue.shade800
+                              : Colors.orange.shade800,
+                        ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -204,7 +229,7 @@ class _MemberTransactionsScreenState
                   style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
                 subtitle: Text(
-                  '${DateFormat('d/MM/yyyy, (HH:mm น.)').format(transaction.transactionDate.toLocal())} (ผู้บันทึก: $creatorName)',
+                  '${DateFormat('d/MM/yyyy500 (HH:mm น.)').format(transaction.transactionDate.toLocal())} \n[ ผู้บันทึก: $creatorName ]',
                 ),
                 trailing: Text(
                   '$amountPrefix฿${NumberFormat("#,##0").format(transaction.amount)}',

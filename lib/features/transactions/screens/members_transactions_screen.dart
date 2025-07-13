@@ -251,7 +251,7 @@ class _MembersTransactionsScreenState
                       ),
                       TextSpan(
                         text:
-                            ' (id:${owner?.userId1 ?? ''}) • ผู้บันทึก: $creatorName\n${DateFormat('d/MM/yyyy, (HH:mm น.)').format(transaction.transactionDate.toLocal())}',
+                            ' (id:${owner?.userId1 ?? ''}) • \n${DateFormat('d/MM/yyyy (HH:mm น.)').format(transaction.transactionDate.toLocal())} \n[ ผู้บันทึก: $creatorName ]',
                       ),
                     ],
                   ),
