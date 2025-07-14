@@ -135,7 +135,7 @@ class _TempleTransactionsScreenState
       await Printing.layoutPdf(
         onLayout: (format) async => pdfData,
         name:
-            'report_${templeName.replaceAll(' ', '_')}_${DateFormat('yyyy-MM').format(_selectedMonth)}.pdf',
+            'report_${templeName.replaceAll(' ', '_')}_${DateFormat('yyyy-MM', 'th').format(_selectedMonth)}.pdf',
       );
     } catch (e) {
       if (context.mounted) {
@@ -168,7 +168,7 @@ class _TempleTransactionsScreenState
                 final adminUser = ref.read(authProvider).user;
                 final allMembers = ref.read(membersProvider).asData?.value;
                 final masterUser =
-                    allMembers?.firstWhereOrNull((u) => u.role == 'Master');
+                    allMembers?.firstWhereOrNull((u) => u.role == UserRole.Master);
                 
                 if (allTransactions != null && templeName != null && allMembers != null) {
                   // Filter for monthly transactions
@@ -339,7 +339,7 @@ class _TempleTransactionsScreenState
                   style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
                 subtitle: Text(
-                  '${DateFormat('d/MM/yyyy (HH:mm น.)', 'th').format(transaction.transactionDate.toLocal())} \n[ผู้บันทึก: $creatorName]',
+                  '${DateFormat.yMd('th').add_Hms().format(transaction.transactionDate.toLocal())} \n[ผู้บันทึก: $creatorName]',
                 ),
                 trailing: Text(
                   '$amountPrefix฿${NumberFormat("#,##0").format(transaction.amount)}',

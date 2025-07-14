@@ -24,7 +24,7 @@ class MembersNotifier extends StateNotifier<AsyncValue<List<User>>> {
 
   Future<void> addUser(User user) async {
     // If the new user is an Admin, they don't get a personal account.
-    if (user.role == 'Admin') {
+    if (user.role == UserRole.Admin) {
       await _dbHelper.addUser(user);
     } else {
       // When adding a new user (Monk/Master), we must also create a

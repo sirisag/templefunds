@@ -41,8 +41,8 @@ List<Account> sortAccountsForTransaction(
     if (userB == null) return -1;
 
     // Master always comes first among members
-    if (userA.role == 'Master' && userB.role != 'Master') return -1;
-    if (userB.role == 'Master' && userA.role != 'Master') return 1;
+    if (userA.role == UserRole.Master && userB.role != UserRole.Master) return -1;
+    if (userB.role == UserRole.Master && userA.role != UserRole.Master) return 1;
 
     // Sort by latest transaction date (descending)
     final dateA = latestTransactionDates[a.id];

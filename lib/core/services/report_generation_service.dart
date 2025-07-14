@@ -5,8 +5,8 @@ import 'package:intl/intl.dart';
 import 'package:month_year_picker/month_year_picker.dart';
 import 'package:printing/printing.dart';
 //import 'package:templefunds/core/models/account_model.dart';
+import 'package:templefunds/core/models/user_model.dart';
 import 'package:templefunds/core/models/transaction_model.dart';
-//import 'package:templefunds/core/models/user_model.dart';
 import 'package:templefunds/core/services/pdf_export_service.dart';
 import 'package:templefunds/features/auth/providers/auth_provider.dart';
 import 'package:templefunds/features/members/providers/members_provider.dart';
@@ -70,7 +70,7 @@ class ReportGenerationService {
       // The ending balance is the starting balance plus the net of the month's transactions.
       final endingBalance = startingBalance + monthlyIncome - monthlyExpense;
 
-      final masterUser = allMembers.firstWhereOrNull((u) => u.role == 'Master');
+      final masterUser = allMembers.firstWhereOrNull((u) => u.role == UserRole.Master);
 
       // 3. Generate PDF
       final pdfService = PdfExportService();
@@ -91,7 +91,7 @@ class ReportGenerationService {
       await Printing.layoutPdf(
         onLayout: (format) async => pdfData,
         name:
-            'report_${templeName.replaceAll(' ', '_')}_${DateFormat('yyyy-MM').format(month)}.pdf',
+            'report_${templeName.replaceAll(' ', '_')}_${DateFormat('yyyy-MM', 'th').format(month)}.pdf',
       );
     } catch (e) {
       _showErrorSnackbar(context, e.toString());
@@ -158,7 +158,7 @@ class ReportGenerationService {
       await Printing.layoutPdf(
         onLayout: (format) async => pdfData,
         name:
-            'report_${memberUser.name.replaceAll(' ', '_')}_${DateFormat('yyyy-MM').format(month)}.pdf',
+            'report_${memberUser.name.replaceAll(' ', '_')}_${DateFormat('yyyy-MM', 'th').format(month)}.pdf',
       );
     } catch (e) {
       _showErrorSnackbar(context, e.toString());

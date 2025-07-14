@@ -26,12 +26,12 @@ class PdfExportService {
     final boldFontData = await rootBundle.load("assets/fonts/Sarabun-Bold.ttf");
     final ttf = pw.Font.ttf(fontData);
     final boldTtf = pw.Font.ttf(boldFontData);
-
+    
     final theme = pw.ThemeData.withFont(
       base: ttf,
       bold: boldTtf,
     );
-
+    
     final currencyFormat = NumberFormat("#,##0.00", "th_TH");
     final monthFormat = DateFormat.yMMMM('th');
 
@@ -80,12 +80,12 @@ class PdfExportService {
     final boldFontData = await rootBundle.load("assets/fonts/Sarabun-Bold.ttf");
     final ttf = pw.Font.ttf(fontData);
     final boldTtf = pw.Font.ttf(boldFontData);
-
+    
     final theme = pw.ThemeData.withFont(
       base: ttf,
       bold: boldTtf,
     );
-
+    
     final currencyFormat = NumberFormat("#,##0.00", "th_TH");
     final monthFormat = DateFormat.yMMMM('th');
 

@@ -1,10 +1,13 @@
+/// Defines the possible roles for a user in the system.
+enum UserRole { Admin, Master, Monk }
+
 /// Represents the User entity from the database.
 class User {
   final int? id; // Nullable for new users that don't have an ID yet.
   final String userId1;
   final String userId2;
   final String name;
-  final String role;
+  final UserRole role;
   final DateTime createdAt;
   final String status; // 'active' or 'inactive'
 
@@ -23,7 +26,7 @@ class User {
     String? userId1,
     String? userId2,
     String? name,
-    String? role,
+    UserRole? role,
     DateTime? createdAt,
     String? status,
   }) {
@@ -46,7 +49,7 @@ class User {
       'user_id_1': userId1,
       'user_id_2': userId2,
       'name': name,
-      'role': role,
+      'role': role.name, // Store the enum's name as a string
       'created_at': createdAt.toIso8601String(),
       'status': status,
     };
@@ -59,7 +62,8 @@ class User {
       userId1: map['user_id_1'] as String,
       userId2: map['user_id_2'] as String,
       name: map['name'] as String,
-      role: map['role'] as String,
+      // Convert string from DB back to enum, default to Monk if invalid
+      role: UserRole.values.byName(map['role'] as String? ?? 'Monk'),
       createdAt: DateTime.parse(map['created_at'] as String),
       status: map['status'] as String? ?? 'active',
     );

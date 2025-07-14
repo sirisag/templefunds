@@ -163,7 +163,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         state = state.copyWith(status: AuthStatus.requiresId2, user: user, errorMessage: null, lockoutUntil: null);
       } else {
         // No database, this is a new Admin registration flow.
-        final tempAdmin = User(userId1: userId1, userId2: '', name: '', role: 'Admin', createdAt: DateTime.now());
+        final tempAdmin = User(userId1: userId1, userId2: '', name: '', role: UserRole.Admin, createdAt: DateTime.now());
         state = state.copyWith(status: AuthStatus.requiresAdminRegistration, user: tempAdmin, errorMessage: null, lockoutUntil: null);
       }
     } catch (e) {
@@ -222,7 +222,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         userId1: state.user!.userId1,
         userId2: id2,
         name: name,
-        role: 'Admin',
+        role: UserRole.Admin,
         createdAt: DateTime.now(),
       );
 

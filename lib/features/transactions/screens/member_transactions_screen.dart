@@ -109,7 +109,7 @@ class _MemberTransactionsScreenState
       await Printing.layoutPdf(
         onLayout: (format) async => pdfData,
         name:
-            'report_${memberUser.name.replaceAll(' ', '_')}_${DateFormat('yyyy-MM').format(_selectedMonth)}.pdf',
+            'report_${memberUser.name.replaceAll(' ', '_')}_${DateFormat('yyyy-MM', 'th').format(_selectedMonth)}.pdf',
       );
     } catch (e) {
       if (context.mounted) {

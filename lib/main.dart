@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:month_year_picker/month_year_picker.dart';
+import 'package:templefunds/core/models/user_model.dart';
+import 'package:templefunds/core/theme/app_theme.dart';
 import 'package:templefunds/features/auth/providers/auth_provider.dart';
 import 'package:templefunds/features/auth/screens/welcome_screen.dart';
 import 'package:templefunds/features/auth/screens/admin_registration_screen.dart';
@@ -14,11 +15,10 @@ import 'package:templefunds/features/home/screens/master_home_screen.dart';
 import 'package:templefunds/features/home/screens/member_home_screen.dart';
 
 void main() async {
-  Intl.defaultLocale = 'th';
   // Ensure that widgets are initialized before running the app.
   WidgetsFlutterBinding.ensureInitialized();
   // Initialize date formatting for all locales, especially for Thai ('th').
-  await initializeDateFormatting();
+  await initializeDateFormatting('th');
   runApp(const ProviderScope(child: MyApp()));
 }
 
@@ -28,11 +28,8 @@ class MyApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return MaterialApp(
-      title: 'แอปบันทึกปัจจัยวัด',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-        useMaterial3: true,
-      ),
+      title: 'Temple Funds Management',
+      theme: AppTheme.lightTheme,
       // Add localization support for month_year_picker and general date formatting
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
@@ -43,6 +40,7 @@ class MyApp extends ConsumerWidget {
       supportedLocales: const [
         Locale('th'), // Your primary locale
       ],
+      locale: const Locale('th'),
       home: const AuthWrapper(),
     );
   }
@@ -66,9 +64,9 @@ class AuthWrapper extends ConsumerWidget {
         );
       case AuthStatus.loggedIn:
         final user = authState.user;
-        if (user?.role == 'Admin') { // ผู้ดูแลระบบ
+        if (user?.role == UserRole.Admin) { // ผู้ดูแลระบบ
           return const AdminHomeScreen();
-        } else if (user?.role == 'Master') { // เจ้าอาวาส
+        } else if (user?.role == UserRole.Master) { // เจ้าอาวาส
           return const MasterHomeScreen();
         } else { // พระลูกวัด (Monk)
           return const MemberHomeScreen();

@@ -10,6 +10,18 @@ import 'package:templefunds/features/members/screens/add_edit_member_screen.dart
 class MemberManagementScreen extends ConsumerWidget {
   const MemberManagementScreen({super.key});
 
+  String _getRoleDisplayName(UserRole role) {
+    switch (role) {
+      case UserRole.Admin:
+        return 'ไวยาวัจกรณ์';
+      case UserRole.Master:
+        return 'เจ้าอาวาส';
+      case UserRole.Monk:
+      default:
+        return 'พระลูกวัด';
+    }
+  }
+
   void _showChangeNameDialog(BuildContext context, WidgetRef ref, User user) async {
     final nameController = TextEditingController(text: user.name);
     final formKey = GlobalKey<FormState>();
@@ -103,26 +115,25 @@ class MemberManagementScreen extends ConsumerWidget {
 
   void _showChangeRoleDialog(
       BuildContext context, WidgetRef ref, User user) async {
-    String selectedRole = user.role;
+    UserRole selectedRole = user.role;
 
-    final newRole = await showDialog<String>(
+    final newRole = await showDialog<UserRole>(
       context: context,
       builder: (ctx) {
         return StatefulBuilder(
           builder: (dialogContext, setDialogState) {
             return AlertDialog(
               title: Text('เปลี่ยนบทบาทของ ${user.name}'),
-              content: DropdownButtonFormField<String>(
+              content: DropdownButtonFormField<UserRole>(
                 value: selectedRole,
                 decoration: const InputDecoration(
                   labelText: 'บทบาทใหม่',
                   border: OutlineInputBorder(),
                 ),
-                items: const [
-                  DropdownMenuItem(value: 'Monk', child: Text('พระลูกวัด')),
-                  DropdownMenuItem(value: 'Master', child: Text('เจ้าอาวาส')),
-                  DropdownMenuItem(value: 'Admin', child: Text('ผู้ดูแลระบบ')),
-                ],
+                items: UserRole.values.map((role) {
+                  return DropdownMenuItem(
+                      value: role, child: Text(_getRoleDisplayName(role)));
+                }).toList(),
                 onChanged: (value) {
                   if (value != null) {
                     setDialogState(() {
@@ -152,7 +163,7 @@ class MemberManagementScreen extends ConsumerWidget {
     if (newRole != null && newRole != user.role && context.mounted) {
       await ref
           .read(membersProvider.notifier)
-          .updateUserRole(user.id!, newRole);
+          .updateUserRole(user.id!, newRole.name);
     }
   }
 
@@ -201,13 +212,13 @@ class MemberManagementScreen extends ConsumerWidget {
 
           // Custom sorting: Admin -> Master -> Monk (alphabetical)
           members.sort((a, b) {
-            int getRoleWeight(String role) {
+            int getRoleWeight(UserRole role) {
               switch (role) {
-                case 'Admin':
+                case UserRole.Admin:
                   return 0;
-                case 'Master':
+                case UserRole.Master:
                   return 1;
-                case 'Monk':
+                case UserRole.Monk:
                 default:
                   return 2;
               }
@@ -232,11 +243,11 @@ class MemberManagementScreen extends ConsumerWidget {
               final bool isActive = user.status == 'active';
               final bool isCurrentUser = user.id == loggedInUser?.id;
 
-              IconData getRoleIcon(String role) {
+              IconData getRoleIcon(UserRole role) {
                 switch (role) {
-                  case 'Admin':
+                  case UserRole.Admin:
                     return Icons.shield_outlined;
-                  case 'Master':
+                  case UserRole.Master:
                     return Icons.school_outlined;
                   default:
                     return Icons.person_outline;
@@ -268,7 +279,7 @@ class MemberManagementScreen extends ConsumerWidget {
                         : '${user.name} ',
                     style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
-                  subtitle: Text('${user.role} : ${user.userId1}'),
+                  subtitle: Text('${_getRoleDisplayName(user.role)} : ${user.userId1}'),
                   trailing: PopupMenuButton<String>(
                     onSelected: (value) {
                       if (value == 'reset_id2') {

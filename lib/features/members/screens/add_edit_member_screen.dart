@@ -19,7 +19,7 @@ class _AddEditMemberScreenState extends ConsumerState<AddEditMemberScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _id1Controller = TextEditingController();
-  String _selectedRole = 'Monk'; // Default role
+  UserRole _selectedRole = UserRole.Monk; // Default role
   bool _isLoading = false;
 
   @override
@@ -27,6 +27,17 @@ class _AddEditMemberScreenState extends ConsumerState<AddEditMemberScreen> {
     _nameController.dispose();
     _id1Controller.dispose();
     super.dispose();
+  }
+
+  String _getRoleDisplayName(UserRole role) {
+    switch (role) {
+      case UserRole.Admin:
+        return 'ไวยาวัจกรณ์';
+      case UserRole.Master:
+        return 'เจ้าอาวาส';
+      case UserRole.Monk:
+        return 'พระลูกวัด';
+    }
   }
 
   Future<void> _submitForm() async {
@@ -97,7 +108,7 @@ class _AddEditMemberScreenState extends ConsumerState<AddEditMemberScreen> {
                 Text('ชื่อ: $name'),
                 Text('ID ชุดที่ 1: $id1'),
                 Text('ID ชุดที่ 2 (ระบบสร้าง): $id2'),
-                Text('บทบาท: $_selectedRole'),
+                Text('บทบาท: ${_getRoleDisplayName(_selectedRole)}'),
               ],
             ),
             actions: [
@@ -158,14 +169,15 @@ class _AddEditMemberScreenState extends ConsumerState<AddEditMemberScreen> {
                 autovalidateMode: AutovalidateMode.onUserInteraction,
               ),
               const SizedBox(height: 16),
-              DropdownButtonFormField<String>(
+              DropdownButtonFormField<UserRole>(
                 value: _selectedRole,
                 decoration: const InputDecoration(labelText: 'บทบาท'),
-                items: const [
-                  DropdownMenuItem(value: 'Monk', child: Text('พระลูกวัด')),
-                  DropdownMenuItem(value: 'Master', child: Text('เจ้าอาวาส')),
-                  DropdownMenuItem(value: 'Admin', child: Text('ไวยาวัจกรณ์')),
-                ],
+                items: UserRole.values.map((role) {
+                  return DropdownMenuItem<UserRole>(
+                    value: role,
+                    child: Text(_getRoleDisplayName(role)),
+                  );
+                }).toList(),
                 onChanged: (value) {
                   if (value != null) setState(() => _selectedRole = value);
                 },
