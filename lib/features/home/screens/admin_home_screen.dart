@@ -218,32 +218,11 @@ class AdminHomeScreen extends ConsumerWidget {
                       ),
                     ),
 
-                  SpeedDial(
-                    icon: Icons.ios_share,
-                    activeIcon: Icons.close,
-                    tooltip: 'สำรอง / ส่งออกข้อมูล',
+                  FloatingActionButton(
                     heroTag: 'export_fab',
-                    buttonSize: const Size(56.0, 56.0),
-                    childrenButtonSize: const Size(60.0, 60.0),
-                    children: [
-                      SpeedDialChild(
-                        child: const Icon(Icons.picture_as_pdf_outlined),
-                        label: 'ส่งออกเป็น PDF',
-                        onTap: () {
-                          // TODO: Implement PDF export screen navigation
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                                content:
-                                    Text('ฟังก์ชันพิมพ์รายงานจะถูกเพิ่มในอนาคต')),
-                          );
-                        },
-                      ), 
-                      SpeedDialChild(
-                        child: const Icon(Icons.storage_outlined),
-                        label: 'สำรองข้อมูล (.db)',
-                        onTap: () => _showDbExportDialog(context, ref),
-                      ),
-                    ],
+                    tooltip: 'สำรองข้อมูล (.db)',
+                    onPressed: () => _showDbExportDialog(context, ref),
+                    child: const Icon(Icons.storage_outlined),
                   ),
                     Padding(
                     padding: const EdgeInsets.only(left: 15.0),

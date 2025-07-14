@@ -10,6 +10,8 @@ class SecureStorageService {
   static const _pinKey = 'user_pin_hash';
   static const _lastUserIdKey = 'last_user_id';
   static const _lastDbExportKey = 'last_db_export_timestamp';
+  static const _loginFailureCountKey = 'login_failure_count';
+  static const _lockoutEndTimeKey = 'lockout_end_time';
 
   /// Hashes a given PIN using SHA-256.
   /// We never store the raw PIN.
@@ -59,10 +61,43 @@ class SecureStorageService {
     return DateTime.tryParse(timestampString);
   }
 
+  /// Gets the current number of consecutive login failures.
+  Future<int> getLoginFailureCount() async {
+    final countString = await _storage.read(key: _loginFailureCountKey);
+    return int.tryParse(countString ?? '0') ?? 0;
+  }
+
+  /// Increments the login failure count and returns the new count.
+  Future<int> incrementLoginFailureCount() async {
+    final currentCount = await getLoginFailureCount();
+    final newCount = currentCount + 1;
+    await _storage.write(key: _loginFailureCountKey, value: newCount.toString());
+    return newCount;
+  }
+
+  /// Resets the login failure count to 0 and clears any lockout.
+  Future<void> resetLoginFailureCount() async {
+    await _storage.delete(key: _loginFailureCountKey);
+    await _storage.delete(key: _lockoutEndTimeKey);
+  }
+
+  /// Gets the time when the current lockout period ends.
+  Future<DateTime?> getLockoutEndTime() async {
+    final timeString = await _storage.read(key: _lockoutEndTimeKey);
+    if (timeString == null) return null;
+    return DateTime.tryParse(timeString);
+  }
+
+  /// Sets the time when the lockout period should end.
+  Future<void> setLockoutEndTime(DateTime endTime) async {
+    await _storage.write(key: _lockoutEndTimeKey, value: endTime.toIso8601String());
+  }
+
   /// Deletes all stored authentication data. Useful for logout.
   Future<void> deleteAll() async {
     await _storage.delete(key: _pinKey);
     await _storage.delete(key: _lastUserIdKey);
     await _storage.delete(key: _lastDbExportKey);
+    await resetLoginFailureCount();
   }
 }

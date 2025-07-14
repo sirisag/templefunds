@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 import 'package:sqflite/sqflite.dart';
 import '../providers/auth_provider.dart';
+import '../widgets/login_error_dialog.dart';
 import '../../members/providers/members_provider.dart';
 import '../../transactions/providers/accounts_provider.dart';
 import '../../settings/providers/settings_provider.dart';
@@ -102,6 +103,7 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
           ),
         );
       }
+      // Error snackbar is handled by the authProvider listener
     }
   }
 
@@ -152,11 +154,13 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
   Widget build(BuildContext context) {
     // Listen for errors from the provider and show a SnackBar
     ref.listen<AuthState>(authProvider, (previous, next) {
-      if (next.status == AuthStatus.loggedOut && next.errorMessage != null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(next.errorMessage!),
-            backgroundColor: Theme.of(context).colorScheme.error,
+      if (next.errorMessage != null) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (_) => LoginErrorDialog(
+            errorMessage: next.errorMessage!,
+            lockoutUntil: next.lockoutUntil,
           ),
         );
         // Clear the error so it doesn't show again on rebuild
@@ -253,15 +257,14 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
-                  if (_dbExists)
-                    TextButton.icon(
-                      onPressed: _resetApp,
-                      icon: const Icon(Icons.delete_forever_outlined),
-                      label: const Text('เริ่มใหม่'),
-                      style: TextButton.styleFrom(
-                        foregroundColor: Theme.of(context).colorScheme.error,
-                      ),
+                  TextButton.icon(
+                    onPressed: _resetApp,
+                    icon: const Icon(Icons.delete_forever_outlined),
+                    label: const Text('เริ่มใหม่'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: Theme.of(context).colorScheme.error,
                     ),
+                  ),
                   TextButton.icon(
                     onPressed: _importFile,
                     icon: const Icon(Icons.file_upload_outlined),

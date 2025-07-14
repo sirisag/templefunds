@@ -44,6 +44,30 @@ class DatabaseHelper {
     }
   }
 
+  /// Validates that the database at the given path has the required table structure.
+  /// Throws an exception if validation fails.
+  Future<void> validateDatabaseFile(String path) async {
+    Database? db;
+    try {
+      db = await openDatabase(path, readOnly: true);
+      const requiredTables = {'users', 'accounts', 'transactions', 'app_metadata'};
+      final tablesResult = await db.rawQuery("SELECT name FROM sqlite_master WHERE type='table'");
+      final existingTables = tablesResult.map((row) => row['name'] as String).toSet();
+
+      final missingTables = requiredTables.difference(existingTables);
+
+      if (missingTables.isNotEmpty) {
+        throw Exception('ไฟล์ข้อมูลไม่ถูกต้อง (ขาดตาราง: ${missingTables.join(', ')})');
+      }
+    } catch (e) {
+      // Re-throw our specific exception or a more generic one if it's not ours.
+      if (e.toString().contains('ขาดตาราง')) rethrow;
+      throw Exception('ไม่สามารถเปิดไฟล์ข้อมูลได้ อาจเป็นไฟล์ที่เสียหายหรือไม่ใช่ไฟล์ฐานข้อมูล');
+    } finally {
+      await db?.close();
+    }
+  }
+
 
   /// This method is called only when the database is created for the first time.
   /// It creates all the necessary tables.

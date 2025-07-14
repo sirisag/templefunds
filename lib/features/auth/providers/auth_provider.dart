@@ -7,10 +7,11 @@ import '../../../core/models/user_model.dart';
 import '../../../core/services/secure_storage_service.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:path/path.dart' as p;
-import 'package:share_plus/share_plus.dart';
+//import 'package:share_plus/share_plus.dart';
 import 'package:sqflite/sqflite.dart';
-import 'package:intl/intl.dart';
+//import 'package:intl/intl.dart';
 import '../../../core/database/database_helper.dart';
+import '../../../core/services/crypto_service.dart';
 import '../../settings/providers/settings_provider.dart';
 
 // Part 1: Define the possible authentication states
@@ -30,12 +31,14 @@ class AuthState {
   final User? user; // The user object when logged in or partially identified
   final String? errorMessage;
   final DateTime? lastDbExport;
+  final DateTime? lockoutUntil;
 
   AuthState({
     this.status = AuthStatus.initializing,
     this.user,
     this.errorMessage,
     this.lastDbExport,
+    this.lockoutUntil,
   });
 
   AuthState copyWith({
@@ -43,12 +46,14 @@ class AuthState {
     User? user,
     String? errorMessage,
     DateTime? lastDbExport,
+    DateTime? lockoutUntil,
   }) {
     return AuthState(
       status: status ?? this.status,
       user: user ?? this.user,
       errorMessage: errorMessage, // Allow clearing the error message
       lastDbExport: lastDbExport ?? this.lastDbExport,
+      lockoutUntil: lockoutUntil,
     );
   }
 }
@@ -64,6 +69,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   Future<void> _init() async {
+    // Check for an existing lockout on app start
+    if (await _isCurrentlyLockedOut()) {
+      return;
+    }
+
     try {
       final lastUserId = await _secureStorage.getLastUserId();
       final lastDbExport = await _secureStorage.getLastDbExportTimestamp();
@@ -91,10 +101,51 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
+  /// Checks if the user is currently locked out and updates the state if so.
+  /// Returns true if locked out, false otherwise.
+  Future<bool> _isCurrentlyLockedOut() async {
+    final lockoutTime = await _secureStorage.getLockoutEndTime();
+    if (lockoutTime != null && lockoutTime.isAfter(DateTime.now())) {
+      state = state.copyWith(
+        // Keep the current status (e.g., loggedOut or requiresPin)
+        status: state.status,
+        errorMessage: 'มีการพยายามเข้าสู่ระบบผิดพลาดหลายครั้ง กรุณารอ',
+        lockoutUntil: lockoutTime,
+      );
+      return true;
+    }
+    return false;
+  }
+
+  /// Handles the logic for a failed login attempt.
+  Future<void> _handleLoginFailure({required String baseErrorMessage}) async {
+    final newFailureCount = await _secureStorage.incrementLoginFailureCount();
+    const lockoutThreshold = 4;
+
+    if (newFailureCount >= lockoutThreshold) {
+      // Lockout duration increases by 1 minute for each failure after the 2nd.
+      final lockoutMinutes = newFailureCount - (lockoutThreshold - 1);
+      final lockoutEndTime = DateTime.now().add(Duration(minutes: lockoutMinutes));
+      await _secureStorage.setLockoutEndTime(lockoutEndTime);
+      state = state.copyWith(
+        // Keep current status, but show lockout info
+        status: state.status,
+        errorMessage: '$baseErrorMessage และถูกล็อกชั่วคราว',
+        lockoutUntil: lockoutEndTime,
+      );
+    } else {
+      state = state.copyWith(
+        status: state.status,
+        errorMessage: baseErrorMessage,
+      );
+    }
+  }
+
   /// This is the main entry point from the WelcomeScreen.
   /// It checks if a database exists to decide if this is a first-time Admin setup
   /// or a login attempt for an existing database.
   Future<void> processId1(String userId1) async {
+    if (await _isCurrentlyLockedOut()) return;
     try {
       // We need to check if the database file already exists on the device.
       final dbPath = await getDatabasesPath();
@@ -108,47 +159,53 @@ class AuthNotifier extends StateNotifier<AuthState> {
           throw Exception('ไม่พบผู้ใช้งานรหัสนี้ในไฟล์ข้อมูล');
         }
         // User found, now we need ID2
-        state = state.copyWith(status: AuthStatus.requiresId2, user: user, errorMessage: null);
+        await _secureStorage.resetLoginFailureCount();
+        state = state.copyWith(status: AuthStatus.requiresId2, user: user, errorMessage: null, lockoutUntil: null);
       } else {
         // No database, this is a new Admin registration flow.
         final tempAdmin = User(userId1: userId1, userId2: '', name: '', role: 'Admin', createdAt: DateTime.now());
-        state = state.copyWith(status: AuthStatus.requiresAdminRegistration, user: tempAdmin, errorMessage: null);
+        state = state.copyWith(status: AuthStatus.requiresAdminRegistration, user: tempAdmin, errorMessage: null, lockoutUntil: null);
       }
     } catch (e) {
-      // Reset to loggedOut but with an error message to show.
-      state = state.copyWith(status: AuthStatus.loggedOut, errorMessage: e.toString().replaceFirst("Exception: ", ""));
+      await _handleLoginFailure(baseErrorMessage: e.toString().replaceFirst("Exception: ", ""));
     }
   }
 
   // This would be called from the ID2 verification screen
   Future<void> verifyId2(String userId2) async {
+    if (await _isCurrentlyLockedOut()) return;
     if (state.user == null) return;
 
     if (state.user!.userId2 == userId2) {
       // ID2 is correct! Move to PIN setup.
-      state = state.copyWith(status: AuthStatus.requiresPinSetup, errorMessage: null);
+      await _secureStorage.resetLoginFailureCount();
+      state = state.copyWith(status: AuthStatus.requiresPinSetup, errorMessage: null, lockoutUntil: null);
     } else {
-      state = state.copyWith(
-          status: AuthStatus.loggedOut, errorMessage: 'รหัสยืนยันตัวตนไม่ถูกต้อง');
+      // Handle failure. The _handleLoginFailure method will update the state
+      // with an error message and potential lockout, while keeping the status as requiresId2.
+      await _handleLoginFailure(baseErrorMessage: 'รหัสยืนยันตัวตนไม่ถูกต้อง');
     }
   }
 
   // This would be called from the PIN screen
   Future<void> setPinAndLogin(String pin) async {
     if (state.user?.id == null) return; // Should not happen, but good practice
+    await _secureStorage.resetLoginFailureCount(); // Reset on successful setup
     await _secureStorage.savePin(pin);
     await _secureStorage.saveLastUserId(state.user!.id!);
-    state = state.copyWith(status: AuthStatus.loggedIn, user: state.user, errorMessage: null);
+    state = state.copyWith(status: AuthStatus.loggedIn, user: state.user, errorMessage: null, lockoutUntil: null);
   }
 
   // This would be called from the PIN screen
   Future<void> loginWithPin(String pin) async {
+    if (await _isCurrentlyLockedOut()) return;
+
     final isPinCorrect = await _secureStorage.verifyPin(pin);
     if (isPinCorrect) {
-      state = state.copyWith(status: AuthStatus.loggedIn, user: state.user);
+      await _secureStorage.resetLoginFailureCount();
+      state = state.copyWith(status: AuthStatus.loggedIn, user: state.user, errorMessage: null, lockoutUntil: null);
     } else {
-      state = state.copyWith(
-          status: AuthStatus.requiresPin, errorMessage: 'PIN ไม่ถูกต้อง');
+      await _handleLoginFailure(baseErrorMessage: 'PIN ไม่ถูกต้อง');
     }
   }
 
@@ -198,43 +255,84 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   /// Handles the database file import process.
   Future<bool> importDatabaseFile() async {
+    File? tempFile;
     try {
-      // 1. Pick the file using FileType.any for better compatibility, as some
-      // platforms have issues with custom extensions.
+      // 1. Pick the file
       final result = await FilePicker.platform.pickFiles(
         type: FileType.any,
       );
 
-      if (result == null || result.files.single.path == null) {
-        // User canceled the picker
-        return false;
+      if (result == null || result.files.single.path == null ) {
+        return false; // User canceled
       }
 
-      final pickedFilePath = result.files.single.path!;
+      final pickedFile = result.files.single;
+      final pickedFilePath = pickedFile.path!;
+      final pickedFileName = pickedFile.name;
 
-      // 1.1 Manually validate the file extension.
-      if (p.extension(pickedFilePath).toLowerCase() != '.db') {
-        throw Exception('กรุณาเลือกไฟล์ฐานข้อมูล (.db) เท่านั้น');
+      if (pickedFileName == null) {
+        throw Exception('ไม่สามารถอ่านชื่อไฟล์ที่นำเข้าได้');
       }
 
-      // 2. Get the app's database path
+      final extension = p.extension(pickedFilePath).toLowerCase();
+      if (extension != '.db' && extension != '.json') {
+        throw Exception('กรุณาเลือกไฟล์สำรองข้อมูล (.db หรือ .json) เท่านั้น');
+      }
+
+      // 2. Read the encrypted file bytes
+      final encryptedBytes = await File(pickedFilePath).readAsBytes();
+
+      // 3. Decrypt the data
+      // Extract the timestamp from the filename to use as the decryption key.
+      final match = RegExp(r'_(\d{8}_\d{4})\.json$').firstMatch(pickedFileName);
+      if (match == null || match.group(1) == null) {
+        throw Exception('ชื่อไฟล์ไม่ถูกต้อง ไม่สามารถถอดรหัสได้');
+      }
+      final timestampKey = match.group(1)!.replaceAll('_', ''); // Key is yyyyMMddHHmm
+
+      final cryptoService = _ref.read(cryptoServiceProvider);
+      final decryptedBytes = cryptoService.decryptData(encryptedBytes, timestampKey);
+      // 4. Define paths and write decrypted data to a temporary file for validation
       final dbDirectoryPath = await getDatabasesPath();
       final appDbPath = p.join(dbDirectoryPath, 'temple_funds.db');
+      final tempDbPath = p.join(dbDirectoryPath, 'import_temp.db');
+      tempFile = File(tempDbPath);
+      await tempFile.writeAsBytes(decryptedBytes);
 
-      // 3. Close any existing database connection to release the file lock
+      // 5. Validate the structure of the temporary database file
+      await _dbHelper.validateDatabaseFile(tempDbPath);
+
+      // 6. If validation is successful, replace the old DB
+      // Close any existing database connection to release the file lock.
       await _dbHelper.close();
 
-      // 4. Copy the picked file to the app's database directory, overwriting it
-      final sourceFile = File(pickedFilePath);
-      await sourceFile.copy(appDbPath);
+      // Delete the old DB if it exists.
+      final oldDbFile = File(appDbPath);
+      if (await oldDbFile.exists()) {
+        await oldDbFile.delete();
+      }
 
-      // 5. Reset the auth state completely by logging out, which clears
-      //    the PIN and last user ID from secure storage.
+      // Rename the validated temp file to be the main DB.
+      await tempFile.rename(appDbPath);
+      tempFile = null; // Prevent deletion in the finally block.
+
+      // 7. Reset the auth state completely.
       await logout();
       return true;
     } catch (e) {
-      state = state.copyWith(errorMessage: 'นำเข้าไฟล์ไม่สำเร็จ: ${e.toString()}');
+      final errorString = e.toString();
+      // Check for common decryption error messages
+      if (errorString.contains('Invalid argument(s): Invalid or corrupted pad block') || errorString.contains('bad padding')) {
+        state = state.copyWith(errorMessage: 'นำเข้าไฟล์ไม่สำเร็จ: รหัสผ่านไม่ถูกต้อง หรือไฟล์เสียหาย');
+      } else {
+        state = state.copyWith(errorMessage: 'นำเข้าไฟล์ไม่สำเร็จ: ${errorString.replaceFirst("Exception: ", "")}');
+      }
       return false;
+    } finally {
+      // Clean up the temp file if it still exists (e.g., on error).
+      if (tempFile != null && await tempFile.exists()) {
+        await tempFile.delete();
+      }
     }
   }
 
@@ -251,6 +349,18 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
     await _secureStorage.savePin(newPin);
     // No need to save last user ID again, it's the same user.
+  }
+
+  /// Allows the user to go back from the ID2 screen to the ID1 screen.
+  Future<void> goBackToId1Screen() async {
+    // This resets the auth flow state without deleting the stored PIN or last user ID.
+    state = AuthState(
+      status: AuthStatus.loggedOut,
+      user: null,
+      errorMessage: null,
+      lockoutUntil: null,
+      lastDbExport: state.lastDbExport,
+    );
   }
 
   /// Resets the entire application to its initial state by deleting the database and PIN.
@@ -273,8 +383,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   /// Clears any existing error message from the state.
   void clearError() {
-    if (state.errorMessage != null) {
-      state = state.copyWith(errorMessage: null);
+    if (state.errorMessage != null || state.lockoutUntil != null) {
+      state = state.copyWith(errorMessage: null, lockoutUntil: null);
     }
   }
 }

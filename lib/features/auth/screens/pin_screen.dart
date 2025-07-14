@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/auth_provider.dart';
+import '../widgets/login_error_dialog.dart';
 
 class PinScreen extends ConsumerStatefulWidget {
   const PinScreen({super.key});
@@ -69,11 +70,13 @@ class _PinScreenState extends ConsumerState<PinScreen> {
     final canPop = Navigator.of(context).canPop();
 
     ref.listen<AuthState>(authProvider, (previous, next) {
-      if (next.status == AuthStatus.requiresPin && next.errorMessage != null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(next.errorMessage!),
-            backgroundColor: Theme.of(context).colorScheme.error,
+      if (next.errorMessage != null) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (_) => LoginErrorDialog(
+            errorMessage: next.errorMessage!,
+            lockoutUntil: next.lockoutUntil,
           ),
         );
         ref.read(authProvider.notifier).clearError();

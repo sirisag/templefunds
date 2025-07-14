@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/auth_provider.dart';
+import '../widgets/login_error_dialog.dart';
 
 class Id2VerificationScreen extends ConsumerStatefulWidget {
   const Id2VerificationScreen({super.key});
@@ -49,9 +50,29 @@ class _Id2VerificationScreenState extends ConsumerState<Id2VerificationScreen> {
   Widget build(BuildContext context) {
     final user = ref.watch(authProvider).user;
 
+    ref.listen<AuthState>(authProvider, (previous, next) {
+      if (next.errorMessage != null) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (_) => LoginErrorDialog(
+            errorMessage: next.errorMessage!,
+            lockoutUntil: next.lockoutUntil,
+          ),
+        );
+        // Clear the error so it doesn't show again on rebuild
+        ref.read(authProvider.notifier).clearError();
+      }
+    });
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('ยืนยันตัวตน'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          tooltip: 'กลับไปหน้ากรอกรหัสประจำตัว',
+          onPressed: () => ref.read(authProvider.notifier).goBackToId1Screen(),
+        ),
       ),
       body: Center(
         child: SingleChildScrollView(
