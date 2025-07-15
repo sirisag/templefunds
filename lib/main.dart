@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:intl/date_symbol_data_local.dart';
-import 'package:month_year_picker/month_year_picker.dart';
 import 'package:templefunds/core/models/user_model.dart';
 import 'package:templefunds/core/theme/app_theme.dart';
 import 'package:templefunds/features/auth/providers/auth_provider.dart';
@@ -35,12 +34,11 @@ class MyApp extends ConsumerWidget {
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
-        MonthYearPickerLocalizations.delegate,
       ],
       supportedLocales: const [
         Locale('th'), // Your primary locale
       ],
-      locale: const Locale('th'),
+      locale: const Locale('th', 'TH'),
       home: const AuthWrapper(),
     );
   }

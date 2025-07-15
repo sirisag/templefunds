@@ -316,6 +316,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
       await tempFile.rename(appDbPath);
       tempFile = null; // Prevent deletion in the finally block.
 
+      // Invalidate the provider so the UI re-fetches the temple name from the new DB.
+      _ref.invalidate(templeNameProvider);
+
       // 7. Reset the auth state completely.
       await logout();
       return true;

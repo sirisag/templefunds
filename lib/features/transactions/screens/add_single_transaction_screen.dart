@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:collection/collection.dart';
+import 'package:flutter_rounded_date_picker/flutter_rounded_date_picker.dart';
 import 'package:intl/intl.dart';
+import 'package:templefunds/core/utils/date_formatter.dart';
 import 'package:templefunds/core/models/account_model.dart';
 import 'package:templefunds/core/models/transaction_model.dart';
 import 'package:templefunds/features/auth/providers/auth_provider.dart';
@@ -47,11 +49,16 @@ class _AddSingleTransactionScreenState
   }
 
   Future<void> _pickDate() async {
-    final date = await showDatePicker(
+    final DateTime? date = await showRoundedDatePicker(
       context: context,
       initialDate: _selectedDate,
       firstDate: DateTime(2000),
       lastDate: DateTime.now(),
+      locale: const Locale('th', 'TH'),
+      borderRadius: 16,
+      textPositiveButton: "ตกลง",
+      textNegativeButton: "ยกเลิก",
+      era: EraMode.BUDDHIST_YEAR,
     );
     if (date == null || !context.mounted) return;
 
@@ -126,11 +133,11 @@ class _AddSingleTransactionScreenState
                 style: TextStyle(fontWeight: FontWeight.bold)),
             const Divider(),
             Text('บัญชี: ${selectedAccount?.name ?? 'ไม่พบ'}'),
-            Text('ประเภท: $typeText'),
+            Text('ประเภท: '),
             Text('จำนวนเงิน: ฿${NumberFormat("#,##0.00").format(amount)}'),
-            Text('คำอธิบาย: $description'),
+            Text('คำอธิบาย: '),
             Text(
-                'วันที่: ${DateFormat('d MMM yyyy, HH:mm', 'th').format(_selectedDate.toLocal())}'),
+                'วันที่: ${DateFormatter.formatBE(_selectedDate.toLocal(), 'd MMM yyyy, HH:mm')}'),
           ],
         ),
         actions: [
@@ -183,7 +190,7 @@ class _AddSingleTransactionScreenState
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text('เกิดข้อผิดพลาด: $e'),
+              content: Text('เกิดข้อผิดพลาด: '),
               backgroundColor: Theme.of(context).colorScheme.error),
         );
       }
@@ -206,7 +213,7 @@ class _AddSingleTransactionScreenState
       body: accountsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (err, stack) =>
-            Center(child: Text('ไม่สามารถโหลดข้อมูลบัญชีได้: $err')),
+            Center(child: Text('ไม่สามารถโหลดข้อมูลบัญชีได้: ')),
         data: (accounts) => SingleChildScrollView(
           padding: const EdgeInsets.all(16.0),
           child: Form(
@@ -273,12 +280,12 @@ class _AddSingleTransactionScreenState
                 ),
                 const SizedBox(height: 16),
                 ListTile(
-                  title: const Text('วันที่ทำรายการ'),
-                  subtitle: Text(DateFormat('d MMMM yyyy, HH:mm', 'th')
-                      .format(_selectedDate.toLocal())),
+                  title: const Text('วันที่และเวลาที่ทำรายการ'),
+                  subtitle: Text(DateFormatter.formatBE(_selectedDate.toLocal(), 'd MMMM yyyy, HH:mm น.')),
                   trailing: const Icon(Icons.calendar_today),
                   onTap: _pickDate,
-                  shape: RoundedRectangleBorder(
+                  tileColor: Colors.grey.shade100,
+                  shape:  RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(8),
                     side: BorderSide(color: Colors.grey.shade400),
                   ),

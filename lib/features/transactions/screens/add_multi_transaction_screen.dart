@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:collection/collection.dart';
+import 'package:flutter_rounded_date_picker/flutter_rounded_date_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:templefunds/core/models/account_model.dart';
+import 'package:templefunds/core/utils/date_formatter.dart';
 import 'package:templefunds/core/models/transaction_model.dart';
 import 'package:templefunds/core/models/user_model.dart';
 //import 'package:templefunds/core/widgets/app_dialogs.dart';
@@ -41,11 +43,13 @@ class _AddMultiTransactionScreenState
   }
 
   Future<void> _pickDate() async {
-    final date = await showDatePicker(
+    final date = await showRoundedDatePicker(
       context: context,
       initialDate: _selectedDate,
       firstDate: DateTime(2000),
       lastDate: DateTime.now(),
+      locale: const Locale('th', 'TH'),
+      era: EraMode.BUDDHIST_YEAR,
     );
     if (date == null || !context.mounted) return;
 
@@ -129,8 +133,7 @@ class _AddMultiTransactionScreenState
     // Get data for confirmation dialog
     final description = _descriptionController.text.trim();
     final typeText = _transactionType == 'income' ? 'รายรับ' : 'รายจ่าย';
-    final dateText =
-        DateFormat('d MMM yyyy, HH:mm', 'th').format(_selectedDate.toLocal());
+    final dateText = DateFormatter.formatBE(_selectedDate.toLocal(), 'd MMM yyyy, HH:mm');
 
     // Get the full account and user objects for the selected IDs
     final allAccounts = ref.read(allAccountsProvider).asData?.value ?? [];
@@ -409,7 +412,7 @@ class _AddMultiTransactionScreenState
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
-              DateFormat('d/MM/yyyy (HH:mm)', 'th').format(_selectedDate.toLocal()),
+              DateFormatter.formatBE(_selectedDate.toLocal(), 'd/MM/yyyy (HH:mm)'),
             ),
             const Icon(Icons.calendar_today, color: Colors.grey),
           ],

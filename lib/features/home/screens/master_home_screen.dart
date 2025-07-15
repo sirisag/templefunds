@@ -38,7 +38,7 @@ class MasterHomeScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('หน้าหลัก (${user?.role ?? "เจ้าอาวาส"})'),
+        title: Text('หน้าหลัก : เจ้าอาวาส'),
         actions: [
           IconButton(
             icon: const Icon(Icons.logout),
@@ -51,7 +51,7 @@ class MasterHomeScreen extends ConsumerWidget {
         padding: const EdgeInsets.all(16.0),
         children: [
           Text(
-            'ยินดีต้อนรับ, ${user?.name ?? 'เจ้าอาวาส'}',
+            'บัญชี : ${user?.name ?? 'เจ้าอาวาส'}',
             style: Theme.of(context).textTheme.headlineSmall,
           ),
           const SizedBox(height: 24),
@@ -79,21 +79,6 @@ class MasterHomeScreen extends ConsumerWidget {
                   );
                 }
               }),
-          const SizedBox(height: 12),
-                    NavigationTile(
-            icon: Icons.picture_as_pdf_outlined,
-            title: 'ส่งออกรายงานวัด',
-            subtitle: 'สร้างรายงาน PDF ของบัญชีวัด (เลือกเดือน)',
-            onTap: () => _exportReport(context, ref, isTempleReport: true),
-          ),
-          const SizedBox(height: 12),
-          NavigationTile(
-            icon: Icons.person_search_outlined,
-            title: 'ส่งออกรายงานส่วนตัว',
-            subtitle: 'สร้างรายงาน PDF ของบัญชีส่วนตัว (เลือกเดือน)',
-            onTap: () => _exportReport(context, ref, isTempleReport: false),
-          ),
-          const SizedBox(height: 12),
           NavigationTile(
             icon: Icons.pin_outlined,
             title: 'เปลี่ยนรหัส PIN',

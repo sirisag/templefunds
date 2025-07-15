@@ -1,5 +1,6 @@
 
 import 'package:flutter/services.dart';
+import 'package:templefunds/core/utils/date_formatter.dart';
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -127,7 +128,7 @@ class PdfExportService {
           style: const pw.TextStyle(fontSize: 16),
         ),
         pw.Text(
-          'ประจำเดือน: ${monthFormat.format(month)}',
+          'ประจำเดือน: ${DateFormatter.formatBE(month, 'MMMM yyyy')}',
         ),
         pw.SizedBox(height: 8),
         if (masterUser != null)
@@ -140,7 +141,7 @@ class PdfExportService {
           ),
         pw.SizedBox(height: 8),
         pw.Text(
-          'พิมพ์เมื่อ: ${DateFormat('d MMMM yyyy, HH:mm', 'th').format(DateTime.now())}',
+          'พิมพ์เมื่อ: ${DateFormatter.formatBE(DateTime.now(), "d MMM yyyy (HH:mm'น.')")}',
         ),
         pw.Divider(height: 20),
       ],
@@ -161,7 +162,7 @@ class PdfExportService {
           style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 16),
         ),
         pw.Text(
-          'ประจำเดือน: ${monthFormat.format(month)}',
+          'ประจำเดือน: ${DateFormatter.formatBE(month, 'MMMM yyyy')}',
         ),
         pw.SizedBox(height: 8),
         if (adminUser != null)
@@ -170,7 +171,7 @@ class PdfExportService {
           ),
         pw.SizedBox(height: 8),
         pw.Text(
-          'พิมพ์เมื่อ: ${DateFormat('d MMMM yyyy, HH:mm', 'th').format(DateTime.now())}',
+          'พิมพ์เมื่อ: ${DateFormatter.formatBE(DateTime.now(), "d MMM yyyy (HH:mm'น.')")}',
         ),
         pw.Divider(height: 20),
       ],
@@ -226,7 +227,7 @@ class PdfExportService {
         4: pw.Alignment.centerRight,
       },
       data: transactions.map((t) {
-        final date = DateFormat('dd/MM/yyyy (HH:mm)', 'th').format(t.transactionDate.toLocal());
+        final date = DateFormatter.formatBE(t.transactionDate.toLocal(), "d MMM yyyy (HH:mm'น.')");
         final income = t.type == 'income' ? currencyFormat.format(t.amount) : '';
         final expense = t.type == 'expense' ? currencyFormat.format(t.amount) : '';
         

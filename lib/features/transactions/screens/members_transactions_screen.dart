@@ -2,6 +2,7 @@ import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:flutter_rounded_date_picker/flutter_rounded_date_picker.dart';
 //import 'package:month_year_picker/month_year_picker.dart';
 //import 'package:templefunds/core/models/account_model.dart';
 import 'package:templefunds/core/models/transaction_model.dart';
@@ -82,12 +83,13 @@ class _MembersTransactionsScreenState
   }
 
   Future<void> _pickDay(BuildContext context) async {
-    final picked = await showDatePicker(
+    final picked = await showRoundedDatePicker(
       context: context,
       initialDate: _selectedDate,
       firstDate: DateTime(2020),
       lastDate: DateTime.now(),
-      locale: const Locale('th'),
+      locale: const Locale('th', 'TH'),
+      era: EraMode.BUDDHIST_YEAR,
     );
     if (picked != null) {
       setState(() {

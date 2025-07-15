@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:templefunds/core/utils/date_formatter.dart';
 import 'package:templefunds/core/models/account_model.dart';
 import 'package:templefunds/core/models/transaction_model.dart';
 import 'package:templefunds/core/models/user_model.dart';
@@ -121,21 +122,23 @@ class AdminHomeScreen extends ConsumerWidget {
           ),
         ],
       ),
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Padding(
-            padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
-            child: Text('ธุรกรรมล่าสุด',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-          ),
-          Expanded(
-            child: _buildRecentTransactionsList(
-                context, transactionsAsync, accountsAsync, membersAsync),
-          ),
-          _buildMainMenu(context),
-          _buildControlPanel(context, ref),
-        ],
+      body: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: Text('ธุรกรรมล่าสุด',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            ),
+            Expanded(
+              child: _buildRecentTransactionsList(
+                  context, transactionsAsync, accountsAsync, membersAsync),
+            ),
+            _buildMainMenu(context),
+            _buildControlPanel(context, ref),
+          ],
+        ),
       ),
     );
   }
@@ -310,7 +313,7 @@ class AdminHomeScreen extends ConsumerWidget {
         children: [
           Text('สำรองล่าสุด:', style: Theme.of(context).textTheme.labelSmall),
           Text(
-            DateFormat('dd/MM/yy HH:mm', 'th').format(lastExportDate.toLocal()),
+            DateFormatter.formatBE(lastExportDate.toLocal(), "d MMM yy (HH:mm'น.')"),
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 13,
@@ -414,7 +417,7 @@ class AdminHomeScreen extends ConsumerWidget {
                       )
                   else
                     const TextSpan(text: 'ไม่พบบัญชี'),
-                  TextSpan(text: ' ${DateFormat.yMd('th').add_Hm().format(transaction.transactionDate.toLocal())}'),
+                  TextSpan(text: ' ${DateFormatter.formatBE(transaction.transactionDate.toLocal(), "d MMM yyyy (HH:mm'น.')")}'),
                 ],
               ),
             ),

@@ -1,8 +1,8 @@
 import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_rounded_date_picker/flutter_rounded_date_picker.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
-import 'package:month_year_picker/month_year_picker.dart';
 import 'package:templefunds/core/models/account_model.dart';
 import 'package:templefunds/core/models/transaction_model.dart';
 import 'package:templefunds/core/models/user_model.dart';
@@ -13,6 +13,7 @@ import 'package:templefunds/features/settings/providers/settings_provider.dart';
 import 'package:templefunds/features/transactions/providers/accounts_provider.dart';
 import 'package:templefunds/features/transactions/providers/transactions_provider.dart';
 import 'package:templefunds/features/transactions/screens/add_single_transaction_screen.dart';
+import 'package:templefunds/core/utils/date_formatter.dart';
 import 'package:templefunds/features/transactions/screens/temple_transactions_screen.dart';
 import 'package:printing/printing.dart';
 
@@ -52,12 +53,14 @@ class _MemberTransactionsScreenState
   }
 
   Future<void> _pickMonth(BuildContext context) async {
-    final picked = await showMonthYearPicker(
+    final picked = await showRoundedDatePicker(
       context: context,
       initialDate: _selectedMonth,
       firstDate: DateTime(2020),
       lastDate: DateTime.now(),
-      locale: const Locale('th'),
+      locale: const Locale("th", "TH"),
+      era: EraMode.BUDDHIST_YEAR,
+      initialDatePickerMode: DatePickerMode.year,
     );
     if (picked != null) {
       setState(() {
@@ -109,7 +112,7 @@ class _MemberTransactionsScreenState
       await Printing.layoutPdf(
         onLayout: (format) async => pdfData,
         name:
-            'report_${memberUser.name.replaceAll(' ', '_')}_${DateFormat('yyyy-MM', 'th').format(_selectedMonth)}.pdf',
+            'report_${memberUser.name.replaceAll(' ', '_')}_${DateFormatter.formatBE(_selectedMonth, 'yyyy-MM')}.pdf',
       );
     } catch (e) {
       if (context.mounted) {
@@ -333,7 +336,7 @@ class _MemberTransactionsScreenState
                   style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
                 subtitle: Text(
-                  '${DateFormat('d/MM/yyyy (HH:mm น.)', 'th').format(transaction.transactionDate.toLocal())} \n[ ผู้บันทึก: $creatorName ]',
+                  '${DateFormatter.formatBE(transaction.transactionDate.toLocal(), "d MMM yyyy (HH:mm'น.')")} \n[ ผู้บันทึก: $creatorName ]',
                 ),
                 trailing: Text(
                   '$amountPrefix฿${NumberFormat("#,##0").format(transaction.amount)}',
@@ -366,7 +369,7 @@ class _MemberTransactionsScreenState
           TextButton(
             onPressed: () => _pickMonth(context),
             child: Text(
-              DateFormat.yMMM('th').format(_selectedMonth),
+              DateFormatter.formatBE(_selectedMonth, 'MMM yyyy'),
               style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
           ),
