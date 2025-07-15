@@ -5,7 +5,7 @@ class AppTheme {
     colorScheme: ColorScheme.fromSeed(
       seedColor: Colors.deepOrange,
       brightness: Brightness.light,
-    ),
+    ).copyWith(surface: const Color.fromARGB(255, 247, 231, 221)),
     useMaterial3: true,
     // To use a custom font like Sarabun, you need to add it to your project's
     // pubspec.yaml file and place the font files in an 'assets/fonts' folder.
@@ -13,7 +13,7 @@ class AppTheme {
     appBarTheme: AppBarTheme(
       elevation: 1,
       shadowColor: Colors.black.withOpacity(0.1),
-      backgroundColor: Colors.grey[50],
+      backgroundColor: const Color.fromARGB(255, 245, 219, 204),
       foregroundColor: Colors.black87,
       titleTextStyle: const TextStyle(
         // fontFamily: 'Sarabun',
@@ -55,7 +55,7 @@ class AppTheme {
         borderRadius: BorderRadius.circular(12),
       ),
       filled: true,
-      fillColor: Colors.grey.shade100.withOpacity(0.5),
+      fillColor: const Color.fromARGB(255, 250, 250, 250).withOpacity(0.5),
     ),
   );
 }

@@ -38,7 +38,7 @@ class MasterHomeScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('หน้าหลัก : เจ้าอาวาส'),
+        title: const Text('หน้าหลัก : เจ้าอาวาส'),
         actions: [
           IconButton(
             icon: const Icon(Icons.logout),
@@ -50,11 +50,31 @@ class MasterHomeScreen extends ConsumerWidget {
       body: ListView(
         padding: const EdgeInsets.all(16.0),
         children: [
-          Text(
-            'บัญชี : ${user?.name ?? 'เจ้าอาวาส'}',
-            style: Theme.of(context).textTheme.headlineSmall,
+
+          const SizedBox(height: 8),
+          Padding(
+            // This creates a 25% margin on the left and right,
+            // making the image take up 50% of the screen width and centering it.
+            padding: EdgeInsets.fromLTRB(
+              MediaQuery.of(context).size.width * 0.15, // Left margin
+              8, // Top spacing
+              MediaQuery.of(context).size.width * 0.15, // Right margin
+              16, // Bottom spacing
+            ),
+            child: ClipRRect(
+              borderRadius:
+                  BorderRadius.circular(100.0), // Creates rounded corners
+              child: Image.asset('assets/icon/icon.png'),
+            ),
           ),
-          const SizedBox(height: 24),
+
+          Center(
+            child: Text(
+              '${user?.name ?? 'เจ้าอาวาส'}',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+          ),
+          const SizedBox(height: 20),
           // Navigation Tiles
           NavigationTile(
               icon: Icons.account_balance_outlined,
@@ -74,11 +94,13 @@ class MasterHomeScreen extends ConsumerWidget {
                 if (user?.id != null) {
                   Navigator.of(context).push(
                     MaterialPageRoute(
-                      builder: (_) => MemberTransactionsScreen(userId: user!.id!),
+                      builder: (_) =>
+                          MemberTransactionsScreen(userId: user!.id!),
                     ),
                   );
                 }
               }),
+          const SizedBox(height: 12),
           NavigationTile(
             icon: Icons.pin_outlined,
             title: 'เปลี่ยนรหัส PIN',

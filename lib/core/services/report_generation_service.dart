@@ -31,7 +31,7 @@ class ReportGenerationService {
       lastDate: DateTime.now(),
       locale: const Locale("th", "TH"),
       era: EraMode.BUDDHIST_YEAR,
-      initialDatePickerMode: DatePickerMode.year,
+      initialDatePickerMode: DatePickerMode.day,
       theme: Theme.of(context),
     );
   }

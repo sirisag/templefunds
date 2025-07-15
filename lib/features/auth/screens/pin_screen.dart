@@ -95,7 +95,7 @@ class _PinScreenState extends ConsumerState<PinScreen> {
               icon: const Icon(Icons.logout),
               label: const Text('ออกจากระบบ'),
               style: TextButton.styleFrom(
-                foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                foregroundColor: Color.fromARGB(255, 61, 60, 60),
               ),
             )
         ],
@@ -108,11 +108,23 @@ class _PinScreenState extends ConsumerState<PinScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(
-                  isSetupMode ? Icons.pin_invoke_outlined : Icons.pin,
-                  size: 64,
-                  color: Theme.of(context).colorScheme.primary,
-                ),
+       //   const SizedBox(height: 8),
+          Padding(
+            // This creates a 25% margin on the left and right,
+            // making the image take up 50% of the screen width and centering it.
+            padding: EdgeInsets.fromLTRB(
+              MediaQuery.of(context).size.width * 0.15, // Left margin
+              8, // Top spacing
+              MediaQuery.of(context).size.width * 0.15, // Right margin
+              16, // Bottom spacing
+            ),
+            child: ClipRRect(
+              borderRadius:
+                  BorderRadius.circular(100.0), // Creates rounded corners
+              child: Image.asset('assets/icon/icon.png'),
+            ),
+          ),
+
                 const SizedBox(height: 16),
                 Text(
                   isSetupMode

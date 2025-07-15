@@ -301,91 +301,93 @@ class _AddMultiTransactionScreenState
                           if (_isLoading)
                             const Center(child: CircularProgressIndicator())
                           else
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                const SizedBox(height: 8),
-                                SegmentedButton<String>(
-                                  segments: const [
-                                    ButtonSegment(
-                                        value: 'expense',
-                                        label: Text('รายจ่าย'),
-                                        icon: Icon(Icons.arrow_upward)),
-                                    ButtonSegment(
-                                        value: 'income',
-                                        label: Text('รายรับ'),
-                                        icon: Icon(Icons.arrow_downward)),
-                                  ],
-                                  selected: {_transactionType},
-                                  onSelectionChanged: (newSelection) => setState(
-                                      () =>
-                                          _transactionType = newSelection.first),
-                                ),
-                                const SizedBox(height: 8),
-                                Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Expanded(
-                                      child: TextFormField(
-                                        controller: _amountController,
-                                        decoration: const InputDecoration(
-                                            labelText: 'จำนวนเงิน',
-                                            border: OutlineInputBorder(),
-                                            prefixText: '฿ '),
-                                        keyboardType:
-                                            const TextInputType.numberWithOptions(
-                                                decimal: true),
-                                        inputFormatters: [
-                                          FilteringTextInputFormatter.allow(
-                                              RegExp(r'^\d+\.?\d{0,2}'))
-                                        ],
-                                        validator: (v) => (v == null ||
-                                                v.isEmpty ||
-                                                double.tryParse(v) == null ||
-                                                double.parse(v) <= 0)
-                                            ? 'ระบุยอด'
-                                            : null,
+                            SafeArea(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  const SizedBox(height: 8),
+                                  SegmentedButton<String>(
+                                    segments: const [
+                                      ButtonSegment(
+                                          value: 'expense',
+                                          label: Text('รายจ่าย'),
+                                          icon: Icon(Icons.arrow_upward)),
+                                      ButtonSegment(
+                                          value: 'income',
+                                          label: Text('รายรับ'),
+                                          icon: Icon(Icons.arrow_downward)),
+                                    ],
+                                    selected: {_transactionType},
+                                    onSelectionChanged: (newSelection) => setState(
+                                        () =>
+                                            _transactionType = newSelection.first),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Row(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Expanded(
+                                        child: TextFormField(
+                                          controller: _amountController,
+                                          decoration: const InputDecoration(
+                                              labelText: 'จำนวนเงิน',
+                                              border: OutlineInputBorder(),
+                                              prefixText: '฿ '),
+                                          keyboardType:
+                                              const TextInputType.numberWithOptions(
+                                                  decimal: true),
+                                          inputFormatters: [
+                                            FilteringTextInputFormatter.allow(
+                                                RegExp(r'^\d+\.?\d{0,2}'))
+                                          ],
+                                          validator: (v) => (v == null ||
+                                                  v.isEmpty ||
+                                                  double.tryParse(v) == null ||
+                                                  double.parse(v) <= 0)
+                                              ? 'ระบุยอด'
+                                              : null,
+                                        ),
                                       ),
-                                    ),
-                                    const SizedBox(width: 7),
-                                                                        Expanded(
-                                      flex: 1,
-                                      child: _buildDatePickerField(),
-                                    ),
-
-                                  ],
-                                ),
-                                
-                                const SizedBox(height: 8),
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: TextFormField(
-                                        controller: _descriptionController,
-                                        decoration: const InputDecoration(
-                                            labelText: 'คำอธิบาย',
-                                            border: OutlineInputBorder()),
-                                        validator: (v) =>
-                                            (v == null || v.trim().isEmpty)
-                                                ? 'กรุณากรอกคำอธิบาย'
-                                                : null,
+                                      const SizedBox(width: 7),
+                                                                          Expanded(
+                                        flex: 1,
+                                        child: _buildDatePickerField(),
                                       ),
-                                    ),
-                                    const SizedBox(width: 7),
-                                    Expanded(
-                                      flex: 1,
-                                      child: ElevatedButton.icon(
-                                        onPressed: _submit,
-                                        icon: const Icon(Icons.save),
-                                        label: const Text('บันทึกธุรกรรม'),
-                                        style: ElevatedButton.styleFrom(
-                                            padding: const EdgeInsets.symmetric(
-                                                vertical: 12)),
+                              
+                                    ],
+                                  ),
+                                  
+                                  const SizedBox(height: 8),
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: TextFormField(
+                                          controller: _descriptionController,
+                                          decoration: const InputDecoration(
+                                              labelText: 'คำอธิบาย',
+                                              border: OutlineInputBorder()),
+                                          validator: (v) =>
+                                              (v == null || v.trim().isEmpty)
+                                                  ? 'กรุณากรอกคำอธิบาย'
+                                                  : null,
+                                        ),
                                       ),
-                                    ),
-                                  ],
-                                ),
-                              ],
+                                      const SizedBox(width: 7),
+                                      Expanded(
+                                        flex: 1,
+                                        child: ElevatedButton.icon(
+                                          onPressed: _submit,
+                                          icon: const Icon(Icons.save),
+                                          label: const Text('บันทึกธุรกรรม'),
+                                          style: ElevatedButton.styleFrom(
+                                              padding: const EdgeInsets.symmetric(
+                                                  vertical: 12)),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
                             ),
                         ],
                       ),

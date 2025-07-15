@@ -72,7 +72,8 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
       builder: (ctx) => AlertDialog(
         title: const Text('ยืนยันการนำเข้าไฟล์'),
         content: const Text(
-            'การนำเข้าไฟล์จะเขียนทับข้อมูลที่มีอยู่ทั้งหมด (ถ้ามี) คุณแน่ใจหรือไม่?'),
+          'การนำเข้าไฟล์จะเขียนทับข้อมูลที่มีอยู่ทั้งหมด (ถ้ามี) คุณแน่ใจหรือไม่?',
+        ),
         actions: [
           TextButton(
             child: const Text('ยกเลิก'),
@@ -113,7 +114,8 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
       builder: (ctx) => AlertDialog(
         title: const Text('ยืนยันการเริ่มใหม่'),
         content: const Text(
-            'การกระทำนี้จะลบข้อมูลทั้งหมดในแอปและกลับสู่สถานะเริ่มต้น คุณแน่ใจหรือไม่?'),
+          'การกระทำนี้จะลบข้อมูลทั้งหมดในแอปและกลับสู่สถานะเริ่มต้น คุณแน่ใจหรือไม่?',
+        ),
         actions: [
           TextButton(
             child: const Text('ยกเลิก'),
@@ -121,7 +123,8 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
           ),
           TextButton(
             style: TextButton.styleFrom(
-                foregroundColor: Theme.of(context).colorScheme.error),
+              foregroundColor: Theme.of(context).colorScheme.error,
+            ),
             child: const Text('ยืนยันลบข้อมูล'),
             onPressed: () => Navigator.of(ctx).pop(true),
           ),
@@ -183,16 +186,34 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(
-                            Icons.account_balance_wallet_outlined,
-                            size: 80,
-                            color: Theme.of(context).colorScheme.primary,
+                          const SizedBox(height: 8),
+                          Padding(
+                            // This creates a 25% margin on the left and right,
+                            // making the image take up 50% of the screen width and centering it.
+                            padding: EdgeInsets.fromLTRB(
+                              MediaQuery.of(context).size.width *
+                                  0.15, // Left margin
+                              8, // Top spacing
+                              MediaQuery.of(context).size.width *
+                                  0.15, // Right margin
+                              16, // Bottom spacing
+                            ),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(
+                                100.0,
+                              ), // Creates rounded corners
+                              child: Image.asset('assets/icon/icon.png'),
+                            ),
                           ),
                           const SizedBox(height: 16),
-                          Text('แอปพลิเคชั่น',
-                              style: Theme.of(context).textTheme.headlineMedium),
-                          Text('บันทึกรายการบัญชีวัด',
-                              style: Theme.of(context).textTheme.headlineMedium),
+                          Text(
+                            'แอปพลิเคชั่น',
+                            style: Theme.of(context).textTheme.headlineMedium,
+                          ),
+                          Text(
+                            'บันทึกรายการบัญชีวัด',
+                            style: Theme.of(context).textTheme.headlineMedium,
+                          ),
                           templeNameAsync.when(
                             data: (name) => (name != null && name.isNotEmpty)
                                 ? Padding(
@@ -203,9 +224,10 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
                                           .textTheme
                                           .titleLarge
                                           ?.copyWith(
-                                              color: Theme.of(context)
-                                                  .colorScheme
-                                                  .secondary),
+                                            color: Theme.of(
+                                              context,
+                                            ).colorScheme.secondary,
+                                          ),
                                       textAlign: TextAlign.center,
                                     ),
                                   )
@@ -224,7 +246,7 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
                             ),
                             keyboardType: TextInputType.number,
                             inputFormatters: [
-                              FilteringTextInputFormatter.digitsOnly
+                              FilteringTextInputFormatter.digitsOnly,
                             ],
                             maxLength: 4,
                             validator: (value) {
@@ -243,9 +265,12 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
                                   label: const Text('ตกลง'),
                                   style: ElevatedButton.styleFrom(
                                     padding: const EdgeInsets.symmetric(
-                                        horizontal: 40, vertical: 16),
-                                    textStyle:
-                                        Theme.of(context).textTheme.titleMedium,
+                                      horizontal: 40,
+                                      vertical: 16,
+                                    ),
+                                    textStyle: Theme.of(
+                                      context,
+                                    ).textTheme.titleMedium,
                                   ),
                                 ),
                         ],

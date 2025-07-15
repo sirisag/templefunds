@@ -5,6 +5,7 @@ import 'package:templefunds/core/widgets/app_dialogs.dart';
 import 'package:templefunds/core/widgets/navigation_tile.dart';
 import 'package:templefunds/features/auth/providers/auth_provider.dart';
 import 'package:templefunds/features/members/screens/change_pin_screen.dart';
+import 'package:templefunds/features/settings/providers/settings_provider.dart';
 import 'package:templefunds/features/transactions/screens/member_transactions_screen.dart';
 
 class MemberHomeScreen extends ConsumerWidget {
@@ -29,7 +30,7 @@ class MemberHomeScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('หน้าหลัก (${user?.role ?? "สมาชิก"})'),
+        title: Text('หน้าหลัก : พระ'),
         actions: [
           IconButton(
             icon: const Icon(Icons.logout),
@@ -41,9 +42,25 @@ class MemberHomeScreen extends ConsumerWidget {
       body: ListView(
         padding: const EdgeInsets.all(16.0),
         children: [
-          Text(
-            'ยินดีต้อนรับ, ${user?.name ?? 'สมาชิก'}',
-            style: Theme.of(context).textTheme.headlineSmall,
+          const SizedBox(height: 8),
+          Padding(
+            padding: EdgeInsets.fromLTRB(
+              MediaQuery.of(context).size.width * 0.15,
+              8,
+              MediaQuery.of(context).size.width * 0.15,
+              16,
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(100.0),
+              child: Image.asset('assets/icon/icon.png'),
+            ),
+          ),
+          
+          Center(
+            child: Text(
+              ' ${user?.name ?? 'สมาชิก'}',
+              style: Theme.of(context).textTheme.headlineSmall,
+            ),
           ),
           const SizedBox(height: 24),
           NavigationTile(
@@ -60,13 +77,7 @@ class MemberHomeScreen extends ConsumerWidget {
               }
             },
           ),
-          const SizedBox(height: 12),
-          NavigationTile(
-            icon: Icons.picture_as_pdf_outlined,
-            title: 'ส่งออกรายงานส่วนตัว',
-            subtitle: 'สร้างรายงาน PDF ของบัญชีส่วนตัว (เลือกเดือน)',
-            onTap: () => _exportReport(context, ref),
-          ),
+
           const SizedBox(height: 12),
           NavigationTile(
             icon: Icons.pin_outlined,
