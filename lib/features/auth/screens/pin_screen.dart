@@ -97,81 +97,65 @@ class _PinScreenState extends ConsumerState<PinScreen> {
               style: TextButton.styleFrom(
                 foregroundColor: Color.fromARGB(255, 61, 60, 60),
               ),
-            )
+            ),
         ],
       ),
       body: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24.0),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-       //   const SizedBox(height: 8),
-          Padding(
-            // This creates a 25% margin on the left and right,
-            // making the image take up 50% of the screen width and centering it.
-            padding: EdgeInsets.fromLTRB(
-              MediaQuery.of(context).size.width * 0.15, // Left margin
-              8, // Top spacing
-              MediaQuery.of(context).size.width * 0.15, // Right margin
-              16, // Bottom spacing
-            ),
-            child: ClipRRect(
-              borderRadius:
-                  BorderRadius.circular(100.0), // Creates rounded corners
-              child: Image.asset('assets/icon/icon.png'),
-            ),
-          ),
-
-                const SizedBox(height: 16),
-                Text(
-                  isSetupMode
-                      ? 'ตั้งรหัส PIN 4 หลักสำหรับเข้าใช้งาน'
-                      : 'สวัสดี, ${authState.user?.name ?? 'ผู้ใช้งาน'}\nกรุณาใส่รหัส PIN ของคุณ',
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
-                const SizedBox(height: 32),
-                TextFormField(
-                  controller: _pinController,
-                  decoration: InputDecoration(
-                    labelText: 'รหัส PIN (4 หลัก)',
-                    border: const OutlineInputBorder(),
-                    counterText: "",
-                    suffixIcon: IconButton(
-                      icon: Icon(_isPinVisible
-                          ? Icons.visibility_off
-                          : Icons.visibility),
-                      onPressed: () {
-                        setState(() {
-                          _isPinVisible = !_isPinVisible;
-                        });
-                      },
+        // Wrap with SafeArea to avoid system UI
+        child: SafeArea(
+          // Wrap with SingleChildScrollView for scrollability
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24.0),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  //   const SizedBox(height: 8),
+                  Padding(
+                    // This creates a 25% margin on the left and right,
+                    // making the image take up 50% of the screen width and centering it.
+                    padding: EdgeInsets.fromLTRB(
+                      MediaQuery.of(context).size.width * 0.15, // Left margin
+                      8, // Top spacing
+                      MediaQuery.of(context).size.width * 0.15, // Right margin
+                      16, // Bottom spacing
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(
+                        100.0,
+                      ), // Creates rounded corners
+                      child: Image.asset('assets/icon/icon.png'),
                     ),
                   ),
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  maxLength: 4,
-                  obscureText: !_isPinVisible,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 24, letterSpacing: 16),
-                  validator: (value) {
-                    if (value == null || value.trim().length != 4) {
-                      return 'กรุณากรอกรหัส PIN 4 หลัก';
-                    }
-                    return null;
-                  },
-                ),
-                if (isSetupMode) ...[
+
                   const SizedBox(height: 16),
+                  Text(
+                    isSetupMode
+                        ? 'ตั้งรหัส PIN 4 หลักสำหรับเข้าใช้งาน'
+                        : 'สวัสดี, ${authState.user?.name ?? 'ผู้ใช้งาน'}\nกรุณาใส่รหัส PIN ของคุณ',
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                  const SizedBox(height: 32),
                   TextFormField(
-                    controller: _confirmPinController,
-                    decoration: const InputDecoration(
-                      labelText: 'ยืนยันรหัส PIN',
-                      border: OutlineInputBorder(),
+                    controller: _pinController,
+                    decoration: InputDecoration(
+                      labelText: 'รหัส PIN (4 หลัก)',
+                      border: const OutlineInputBorder(),
                       counterText: "",
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          _isPinVisible
+                              ? Icons.visibility_off
+                              : Icons.visibility,
+                        ),
+                        onPressed: () {
+                          setState(() {
+                            _isPinVisible = !_isPinVisible;
+                          });
+                        },
+                      ),
                     ),
                     keyboardType: TextInputType.number,
                     inputFormatters: [FilteringTextInputFormatter.digitsOnly],
@@ -180,28 +164,54 @@ class _PinScreenState extends ConsumerState<PinScreen> {
                     textAlign: TextAlign.center,
                     style: const TextStyle(fontSize: 24, letterSpacing: 16),
                     validator: (value) {
-                      if (value != _pinController.text) {
-                        return 'รหัส PIN ไม่ตรงกัน';
+                      if (value == null || value.trim().length != 4) {
+                        return 'กรุณากรอกรหัส PIN 4 หลัก';
                       }
                       return null;
                     },
                   ),
-                ],
-                const SizedBox(height: 24),
-                if (_isLoading)
-                  const CircularProgressIndicator()
-                else
-                  ElevatedButton(
-                    onPressed: () => _submit(isSetupMode),
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 40, vertical: 16),
-                      textStyle: Theme.of(context).textTheme.titleMedium,
+                  if (isSetupMode) ...[
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: _confirmPinController,
+                      decoration: const InputDecoration(
+                        labelText: 'ยืนยันรหัส PIN',
+                        border: OutlineInputBorder(),
+                        counterText: "",
+                      ),
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                      maxLength: 4,
+                      obscureText: !_isPinVisible,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(fontSize: 24, letterSpacing: 16),
+                      validator: (value) {
+                        if (value != _pinController.text) {
+                          return 'รหัส PIN ไม่ตรงกัน';
+                        }
+                        return null;
+                      },
                     ),
-                    child:
-                        Text(isSetupMode ? 'ยืนยันและเข้าสู่ระบบ' : 'เข้าสู่ระบบ'),
-                  ),
-              ],
+                  ],
+                  const SizedBox(height: 24),
+                  if (_isLoading)
+                    const CircularProgressIndicator()
+                  else
+                    ElevatedButton(
+                      onPressed: () => _submit(isSetupMode),
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 40,
+                          vertical: 16,
+                        ),
+                        textStyle: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      child: Text(
+                        isSetupMode ? 'ยืนยันและเข้าสู่ระบบ' : 'เข้าสู่ระบบ',
+                      ),
+                    ),
+                ],
+              ),
             ),
           ),
         ),
