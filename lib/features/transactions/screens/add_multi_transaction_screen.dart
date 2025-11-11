@@ -56,12 +56,23 @@ class _AddMultiTransactionScreenState
     final time = await showTimePicker(
       context: context,
       initialTime: TimeOfDay.fromDateTime(_selectedDate),
+      builder: (context, child) {
+        return MediaQuery(
+          data: MediaQuery.of(context).copyWith(alwaysUse24HourFormat: true),
+          child: child!,
+        );
+      },
     );
     if (time == null) return;
 
     setState(() {
-      _selectedDate =
-          DateTime(date.year, date.month, date.day, time.hour, time.minute);
+      _selectedDate = DateTime(
+        date.year,
+        date.month,
+        date.day,
+        time.hour,
+        time.minute,
+      );
     });
   }
 
@@ -81,8 +92,9 @@ class _AddMultiTransactionScreenState
       for (final accountId in _selectedAccountIds) {
         final currentBalance = ref.read(filteredBalanceProvider(accountId));
         if (amount > currentBalance) {
-          final account =
-              allAccounts.firstWhereOrNull((acc) => acc.id == accountId);
+          final account = allAccounts.firstWhereOrNull(
+            (acc) => acc.id == accountId,
+          );
           if (account != null) {
             overdraftAccounts.add(account);
           }
@@ -90,13 +102,15 @@ class _AddMultiTransactionScreenState
       }
 
       if (overdraftAccounts.isNotEmpty) {
-        final accountNames = overdraftAccounts.map((acc) {
-          final user = userMap[acc.ownerUserId];
-          if (user != null) {
-            return '${user.name} (ID: ${user.userId1})';
-          }
-          return acc.name;
-        }).join('\n • ');
+        final accountNames = overdraftAccounts
+            .map((acc) {
+              final user = userMap[acc.ownerUserId];
+              if (user != null) {
+                return '${user.name} (ID: ${user.userId1})';
+              }
+              return acc.name;
+            })
+            .join('\n • ');
 
         final continueAnyway = await showDialog<bool>(
           context: context,
@@ -104,7 +118,8 @@ class _AddMultiTransactionScreenState
             title: const Text('คำเตือน: ยอดเงินไม่เพียงพอ'),
             content: SingleChildScrollView(
               child: Text(
-                  'การถอนเงินจำนวน ${NumberFormat("#,##0.00").format(amount)} ฿ จะทำให้บัญชีต่อไปนี้มียอดติดลบ:\n\n • $accountNames\n\nคุณต้องการดำเนินการต่อหรือไม่?'),
+                'การถอนเงินจำนวน ${NumberFormat("#,##0.00").format(amount)} ฿ จะทำให้บัญชีต่อไปนี้มียอดติดลบ:\n\n • $accountNames\n\nคุณต้องการดำเนินการต่อหรือไม่?',
+              ),
             ),
             actions: [
               TextButton(
@@ -133,7 +148,10 @@ class _AddMultiTransactionScreenState
     // Get data for confirmation dialog
     final description = _descriptionController.text.trim();
     final typeText = _transactionType == 'income' ? 'รายรับ' : 'รายจ่าย';
-    final dateText = DateFormatter.formatBE(_selectedDate.toLocal(), 'd MMM yyyy, HH:mm');
+    final dateText = DateFormatter.formatBE(
+      _selectedDate.toLocal(),
+      'd MMM yyyy, HH:mm',
+    );
 
     // Get the full account and user objects for the selected IDs
     final allAccounts = ref.read(allAccountsProvider).asData?.value ?? [];
@@ -162,23 +180,30 @@ class _AddMultiTransactionScreenState
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('กรุณาตรวจสอบข้อมูลก่อนบันทึก:',
-                  style: TextStyle(fontWeight: FontWeight.bold)),
+              const Text(
+                'กรุณาตรวจสอบข้อมูลก่อนบันทึก:',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
               const Divider(),
               Text('ประเภท: $typeText'),
               Text(
-                  'จำนวนเงิน (ต่อบัญชี): ฿${NumberFormat("#,##0.00").format(amount)}'),
+                'จำนวนเงิน (ต่อบัญชี): ฿${NumberFormat("#,##0.00").format(amount)}',
+              ),
               Text('คำอธิบาย: $description'),
               Text('วันที่: $dateText'),
               const Divider(),
-              Text('สำหรับ ${selectedAccounts.length} บัญชี:',
-                  style: const TextStyle(fontWeight: FontWeight.bold)),
+              Text(
+                'สำหรับ ${selectedAccounts.length} บัญชี:',
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
               const SizedBox(height: 8),
               // Display list of selected accounts
-              ...accountNames.map((name) => Padding(
-                    padding: const EdgeInsets.only(bottom: 4.0),
-                    child: Text(' • $name'),
-                  )),
+              ...accountNames.map(
+                (name) => Padding(
+                  padding: const EdgeInsets.only(bottom: 4.0),
+                  child: Text(' • $name'),
+                ),
+              ),
             ],
           ),
         ),
@@ -209,16 +234,18 @@ class _AddMultiTransactionScreenState
 
     List<Transaction> transactionsToCreate = [];
     for (final accountId in _selectedAccountIds) {
-      transactionsToCreate.add(Transaction(
-        id: const Uuid().v4(),
-        accountId: accountId,
-        type: _transactionType,
-        amount: amount,
-        description: description,
-        transactionDate: _selectedDate,
-        createdByUserId: loggedInUser.id!,
-        createdAt: DateTime.now(),
-      ));
+      transactionsToCreate.add(
+        Transaction(
+          id: const Uuid().v4(),
+          accountId: accountId,
+          type: _transactionType,
+          amount: amount,
+          description: description,
+          transactionDate: _selectedDate,
+          createdByUserId: loggedInUser.id!,
+          createdAt: DateTime.now(),
+        ),
+      );
     }
 
     try {
@@ -229,8 +256,9 @@ class _AddMultiTransactionScreenState
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-              content: Text('บันทึกธุรกรรมสำเร็จ'),
-              backgroundColor: Colors.green),
+            content: Text('บันทึกธุรกรรมสำเร็จ'),
+            backgroundColor: Colors.green,
+          ),
         );
         Navigator.of(context).pop();
       }
@@ -238,8 +266,9 @@ class _AddMultiTransactionScreenState
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text('เกิดข้อผิดพลาด: $e'),
-              backgroundColor: Theme.of(context).colorScheme.error),
+            content: Text('เกิดข้อผิดพลาด: $e'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
         );
       }
     } finally {
@@ -288,9 +317,7 @@ class _AddMultiTransactionScreenState
                         children: [
                           Text(
                             'เลือกบัญชี',
-                            style: Theme.of(context)
-                                .textTheme
-                                .titleMedium
+                            style: Theme.of(context).textTheme.titleMedium
                                 ?.copyWith(fontWeight: FontWeight.bold),
                           ),
                           const Divider(),
@@ -309,38 +336,47 @@ class _AddMultiTransactionScreenState
                                   SegmentedButton<String>(
                                     segments: const [
                                       ButtonSegment(
-                                          value: 'expense',
-                                          label: Text('รายจ่าย'),
-                                          icon: Icon(Icons.arrow_upward)),
+                                        value: 'expense',
+                                        label: Text('รายจ่าย'),
+                                        icon: Icon(Icons.arrow_upward),
+                                      ),
                                       ButtonSegment(
-                                          value: 'income',
-                                          label: Text('รายรับ'),
-                                          icon: Icon(Icons.arrow_downward)),
+                                        value: 'income',
+                                        label: Text('รายรับ'),
+                                        icon: Icon(Icons.arrow_downward),
+                                      ),
                                     ],
                                     selected: {_transactionType},
-                                    onSelectionChanged: (newSelection) => setState(
-                                        () =>
-                                            _transactionType = newSelection.first),
+                                    onSelectionChanged: (newSelection) =>
+                                        setState(
+                                          () => _transactionType =
+                                              newSelection.first,
+                                        ),
                                   ),
                                   const SizedBox(height: 8),
                                   Row(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Expanded(
                                         child: TextFormField(
                                           controller: _amountController,
                                           decoration: const InputDecoration(
-                                              labelText: 'จำนวนเงิน',
-                                              border: OutlineInputBorder(),
-                                              prefixText: '฿ '),
+                                            labelText: 'จำนวนเงิน',
+                                            border: OutlineInputBorder(),
+                                            prefixText: '฿ ',
+                                          ),
                                           keyboardType:
                                               const TextInputType.numberWithOptions(
-                                                  decimal: true),
+                                                decimal: true,
+                                              ),
                                           inputFormatters: [
                                             FilteringTextInputFormatter.allow(
-                                                RegExp(r'^\d+\.?\d{0,2}'))
+                                              RegExp(r'^\d+\.?\d{0,2}'),
+                                            ),
                                           ],
-                                          validator: (v) => (v == null ||
+                                          validator: (v) =>
+                                              (v == null ||
                                                   v.isEmpty ||
                                                   double.tryParse(v) == null ||
                                                   double.parse(v) <= 0)
@@ -349,14 +385,13 @@ class _AddMultiTransactionScreenState
                                         ),
                                       ),
                                       const SizedBox(width: 7),
-                                                                          Expanded(
+                                      Expanded(
                                         flex: 1,
                                         child: _buildDatePickerField(),
                                       ),
-                              
                                     ],
                                   ),
-                                  
+
                                   const SizedBox(height: 8),
                                   Row(
                                     children: [
@@ -364,12 +399,13 @@ class _AddMultiTransactionScreenState
                                         child: TextFormField(
                                           controller: _descriptionController,
                                           decoration: const InputDecoration(
-                                              labelText: 'คำอธิบาย',
-                                              border: OutlineInputBorder()),
+                                            labelText: 'คำอธิบาย',
+                                            border: OutlineInputBorder(),
+                                          ),
                                           validator: (v) =>
                                               (v == null || v.trim().isEmpty)
-                                                  ? 'กรุณากรอกคำอธิบาย'
-                                                  : null,
+                                              ? 'กรุณากรอกคำอธิบาย'
+                                              : null,
                                         ),
                                       ),
                                       const SizedBox(width: 7),
@@ -380,8 +416,10 @@ class _AddMultiTransactionScreenState
                                           icon: const Icon(Icons.save),
                                           label: const Text('บันทึกธุรกรรม'),
                                           style: ElevatedButton.styleFrom(
-                                              padding: const EdgeInsets.symmetric(
-                                                  vertical: 12)),
+                                            padding: const EdgeInsets.symmetric(
+                                              vertical: 12,
+                                            ),
+                                          ),
                                         ),
                                       ),
                                     ],
@@ -403,22 +441,19 @@ class _AddMultiTransactionScreenState
   }
 
   Widget _buildDatePickerField() {
-    return InkWell(
+    return TextFormField(
       onTap: _pickDate,
-      child: InputDecorator(
-        decoration: const InputDecoration(
-          border: InputBorder.none,
-          contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 15),
+      readOnly: true,
+      controller: TextEditingController(
+        text: DateFormatter.formatBE(
+          _selectedDate.toLocal(),
+          'd MMM yy, HH:mm',
         ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              DateFormatter.formatBE(_selectedDate.toLocal(), 'd/MM/yyyy (HH:mm)'),
-            ),
-            const Icon(Icons.calendar_today, color: Colors.grey),
-          ],
-        ),
+      ),
+      decoration: const InputDecoration(
+        labelText: 'วันที่',
+        border: OutlineInputBorder(),
+        suffixIcon: Icon(Icons.calendar_today),
       ),
     );
   }
@@ -442,7 +477,7 @@ class _AddMultiTransactionScreenState
                 itemBuilder: (context, index) {
                   final account = accounts[index];
                   final user = userMap[account.ownerUserId];
-                  
+
                   String namePart;
                   String idPart = '';
                   if (user != null) {
@@ -458,10 +493,18 @@ class _AddMultiTransactionScreenState
                     dense: true,
                     title: RichText(
                       text: TextSpan(
-                        style: DefaultTextStyle.of(context).style.copyWith(fontSize: 18),
+                        style: DefaultTextStyle.of(
+                          context,
+                        ).style.copyWith(fontSize: 18),
                         children: [
-                          TextSpan(text: namePart, style: const TextStyle(fontWeight: FontWeight.bold)),
-                          TextSpan(text: idPart, style: TextStyle(color: Colors.grey.shade700)),
+                          TextSpan(
+                            text: namePart,
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          TextSpan(
+                            text: idPart,
+                            style: TextStyle(color: Colors.grey.shade700),
+                          ),
                         ],
                       ),
                     ),
@@ -486,8 +529,9 @@ class _AddMultiTransactionScreenState
                 child: Text(
                   formFieldState.errorText!,
                   style: TextStyle(
-                      color: Theme.of(context).colorScheme.error,
-                      fontSize: 12),
+                    color: Theme.of(context).colorScheme.error,
+                    fontSize: 12,
+                  ),
                 ),
               ),
           ],

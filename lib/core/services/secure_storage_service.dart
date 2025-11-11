@@ -51,7 +51,8 @@ class SecureStorageService {
 
   /// Saves the timestamp of the last successful DB export.
   Future<void> saveLastDbExportTimestamp(DateTime timestamp) async {
-    await _storage.write(key: _lastDbExportKey, value: timestamp.toIso8601String());
+    await _storage.write(
+        key: _lastDbExportKey, value: timestamp.toIso8601String());
   }
 
   /// Reads the timestamp of the last successful DB export.
@@ -71,7 +72,8 @@ class SecureStorageService {
   Future<int> incrementLoginFailureCount() async {
     final currentCount = await getLoginFailureCount();
     final newCount = currentCount + 1;
-    await _storage.write(key: _loginFailureCountKey, value: newCount.toString());
+    await _storage.write(
+        key: _loginFailureCountKey, value: newCount.toString());
     return newCount;
   }
 
@@ -90,14 +92,22 @@ class SecureStorageService {
 
   /// Sets the time when the lockout period should end.
   Future<void> setLockoutEndTime(DateTime endTime) async {
-    await _storage.write(key: _lockoutEndTimeKey, value: endTime.toIso8601String());
+    await _storage.write(
+        key: _lockoutEndTimeKey, value: endTime.toIso8601String());
+  }
+
+  /// Deletes only the authentication-related data, preserving other settings.
+  Future<void> deleteAuthCredentials() async {
+    await _storage.delete(key: _pinKey);
+    await _storage.delete(key: _lastUserIdKey);
+    await resetLoginFailureCount(); // This also clears lockout time
   }
 
   /// Deletes all stored authentication data. Useful for logout.
   Future<void> deleteAll() async {
-    await _storage.delete(key: _pinKey);
-    await _storage.delete(key: _lastUserIdKey);
+    // This method now deletes everything, including non-auth data that might be in secure storage.
+    // For a standard logout, use `deleteAuthCredentials` instead.
+    await deleteAuthCredentials();
     await _storage.delete(key: _lastDbExportKey);
-    await resetLoginFailureCount();
   }
 }

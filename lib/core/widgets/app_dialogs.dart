@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:templefunds/features/auth/providers/auth_provider.dart';
+import 'package:templefunds/features/auth/screens/welcome_screen.dart';
 
 /// Shows a confirmation dialog for logging out.
 /// Can be called from any widget that has access to [BuildContext] and [WidgetRef].
@@ -17,9 +19,18 @@ Future<void> showLogoutConfirmationDialog(BuildContext context, WidgetRef ref) {
         ),
         TextButton(
           child: const Text('ตกลง'),
-          onPressed: () {
+          onPressed: () async {
+            // Close the dialog first.
             Navigator.of(ctx).pop();
-            ref.read(authProvider.notifier).logout();
+            // Perform the logout logic.
+            await ref.read(authProvider.notifier).logout();
+            // After logout, explicitly navigate back to the WelcomeScreen and
+            // clear the entire navigation stack to prevent any old screens from
+            // remaining. This provides a clean and predictable user experience.
+            Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
+              MaterialPageRoute(builder: (_) => const WelcomeScreen()),
+              (route) => false,
+            );
           },
         ),
       ],

@@ -65,12 +65,23 @@ class _AddSingleTransactionScreenState
     final time = await showTimePicker(
       context: context,
       initialTime: TimeOfDay.fromDateTime(_selectedDate),
+      builder: (context, child) {
+        return MediaQuery(
+          data: MediaQuery.of(context).copyWith(alwaysUse24HourFormat: true),
+          child: child!,
+        );
+      },
     );
     if (time == null) return;
 
     setState(() {
       _selectedDate = DateTime(
-          date.year, date.month, date.day, time.hour, time.minute);
+        date.year,
+        date.month,
+        date.day,
+        time.hour,
+        time.minute,
+      );
     });
   }
 
@@ -82,14 +93,17 @@ class _AddSingleTransactionScreenState
 
     // --- Overdraft Check ---
     if (isExpense) {
-      final currentBalance = ref.read(filteredBalanceProvider(_selectedAccountId!));
+      final currentBalance = ref.watch(
+        filteredBalanceProvider(_selectedAccountId!),
+      );
       if (amount > currentBalance) {
         final continueAnyway = await showDialog<bool>(
           context: context,
           builder: (ctx) => AlertDialog(
             title: const Text('คำเตือน: ยอดเงินไม่เพียงพอ'),
             content: Text(
-                'ยอดเงินคงเหลือ (${NumberFormat("#,##0.00").format(currentBalance)} ฿) ไม่เพียงพอสำหรับการถอนยอดนี้ (${NumberFormat("#,##0.00").format(amount)} ฿)\n\nการทำรายการจะทำให้ยอดเงินติดลบ คุณต้องการดำเนินการต่อหรือไม่?'),
+              'ยอดเงินคงเหลือ (${NumberFormat("#,##0.00").format(currentBalance)} ฿) ไม่เพียงพอสำหรับการถอนยอดนี้ (${NumberFormat("#,##0.00").format(amount)} ฿)\n\nการทำรายการจะทำให้ยอดเงินติดลบ คุณต้องการดำเนินการต่อหรือไม่?',
+            ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(ctx).pop(false),
@@ -116,8 +130,9 @@ class _AddSingleTransactionScreenState
 
     // Get data for confirmation dialog
     final accounts = ref.read(allAccountsProvider).asData?.value ?? [];
-    final selectedAccount =
-        accounts.firstWhereOrNull((acc) => acc.id == _selectedAccountId);
+    final selectedAccount = accounts.firstWhereOrNull(
+      (acc) => acc.id == _selectedAccountId,
+    );
     final description = _descriptionController.text.trim();
     final typeText = _transactionType == 'income' ? 'รายรับ' : 'รายจ่าย';
 
@@ -129,15 +144,18 @@ class _AddSingleTransactionScreenState
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('กรุณาตรวจสอบข้อมูลก่อนบันทึก:',
-                style: TextStyle(fontWeight: FontWeight.bold)),
+            const Text(
+              'กรุณาตรวจสอบข้อมูลก่อนบันทึก:',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
             const Divider(),
             Text('บัญชี: ${selectedAccount?.name ?? 'ไม่พบ'}'),
             Text('ประเภท: '),
             Text('จำนวนเงิน: ฿${NumberFormat("#,##0.00").format(amount)}'),
             Text('คำอธิบาย: '),
             Text(
-                'วันที่: ${DateFormatter.formatBE(_selectedDate.toLocal(), 'd MMM yyyy, HH:mm')}'),
+              'วันที่: ${DateFormatter.formatBE(_selectedDate.toLocal(), 'd MMM yyyy, HH:mm')}',
+            ),
           ],
         ),
         actions: [
@@ -181,8 +199,9 @@ class _AddSingleTransactionScreenState
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-              content: Text('บันทึกธุรกรรมสำเร็จ'),
-              backgroundColor: Colors.green),
+            content: Text('บันทึกธุรกรรมสำเร็จ'),
+            backgroundColor: Colors.green,
+          ),
         );
         Navigator.of(context).pop();
       }
@@ -190,8 +209,9 @@ class _AddSingleTransactionScreenState
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text('เกิดข้อผิดพลาด: '),
-              backgroundColor: Theme.of(context).colorScheme.error),
+            content: Text('เกิดข้อผิดพลาด: '),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
         );
       }
     } finally {
@@ -225,10 +245,16 @@ class _AddSingleTransactionScreenState
                   DropdownButtonFormField<int>(
                     value: _selectedAccountId,
                     decoration: const InputDecoration(
-                        labelText: 'บัญชี', border: OutlineInputBorder()),
+                      labelText: 'บัญชี',
+                      border: OutlineInputBorder(),
+                    ),
                     items: accounts
-                        .map((account) => DropdownMenuItem(
-                            value: account.id, child: Text(account.name)))
+                        .map(
+                          (account) => DropdownMenuItem(
+                            value: account.id,
+                            child: Text(account.name),
+                          ),
+                        )
                         .toList(),
                     onChanged: (value) =>
                         setState(() => _selectedAccountId = value),
@@ -238,13 +264,15 @@ class _AddSingleTransactionScreenState
                 SegmentedButton<String>(
                   segments: const [
                     ButtonSegment(
-                        value: 'expense',
-                        label: Text('รายจ่าย'),
-                        icon: Icon(Icons.arrow_upward)),
+                      value: 'expense',
+                      label: Text('รายจ่าย'),
+                      icon: Icon(Icons.arrow_upward),
+                    ),
                     ButtonSegment(
-                        value: 'income',
-                        label: Text('รายรับ'),
-                        icon: Icon(Icons.arrow_downward)),
+                      value: 'income',
+                      label: Text('รายรับ'),
+                      icon: Icon(Icons.arrow_downward),
+                    ),
                   ],
                   selected: {_transactionType},
                   onSelectionChanged: (newSelection) =>
@@ -254,15 +282,20 @@ class _AddSingleTransactionScreenState
                 TextFormField(
                   controller: _amountController,
                   decoration: const InputDecoration(
-                      labelText: 'จำนวนเงิน',
-                      border: OutlineInputBorder(),
-                      prefixText: '฿ '),
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
+                    labelText: 'จำนวนเงิน',
+                    border: OutlineInputBorder(),
+                    prefixText: '฿ ',
+                  ),
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
                   inputFormatters: [
-                    FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}'))
+                    FilteringTextInputFormatter.allow(
+                      RegExp(r'^\d+\.?\d{0,2}'),
+                    ),
                   ],
-                  validator: (v) => (v == null ||
+                  validator: (v) =>
+                      (v == null ||
                           v.isEmpty ||
                           double.tryParse(v) == null ||
                           double.parse(v) <= 0)
@@ -273,19 +306,27 @@ class _AddSingleTransactionScreenState
                 TextFormField(
                   controller: _descriptionController,
                   decoration: const InputDecoration(
-                      labelText: 'คำอธิบาย', border: OutlineInputBorder()),
+                    labelText: 'คำอธิบาย',
+                    border: OutlineInputBorder(),
+                  ),
                   maxLines: 1,
-                  validator: (v) =>
-                      (v == null || v.trim().isEmpty) ? 'กรุณากรอกคำอธิบาย' : null,
+                  validator: (v) => (v == null || v.trim().isEmpty)
+                      ? 'กรุณากรอกคำอธิบาย'
+                      : null,
                 ),
                 const SizedBox(height: 16),
                 ListTile(
                   title: const Text('วันที่และเวลาที่ทำรายการ'),
-                  subtitle: Text(DateFormatter.formatBE(_selectedDate.toLocal(), 'd MMMM yyyy, HH:mm น.')),
+                  subtitle: Text(
+                    DateFormatter.formatBE(
+                      _selectedDate.toLocal(),
+                      'd MMMM yyyy, HH:mm น.',
+                    ),
+                  ),
                   trailing: const Icon(Icons.calendar_today),
                   onTap: _pickDate,
                   tileColor: Colors.grey.shade100,
-                  shape:  RoundedRectangleBorder(
+                  shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(8),
                     side: BorderSide(color: Colors.grey.shade400),
                   ),
@@ -298,7 +339,8 @@ class _AddSingleTransactionScreenState
                         icon: const Icon(Icons.save),
                         label: const Text('บันทึกธุรกรรม'),
                         style: ElevatedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 16)),
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                        ),
                       ),
               ],
             ),

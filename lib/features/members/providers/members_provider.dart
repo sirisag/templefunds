@@ -2,13 +2,17 @@ import 'dart:math';
 import 'package:collection/collection.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:templefunds/core/database/database_helper.dart';
+import 'package:templefunds/core/services/crypto_service.dart';
 import 'package:templefunds/core/models/account_model.dart';
 import 'package:templefunds/core/models/user_model.dart';
 
 class MembersNotifier extends StateNotifier<AsyncValue<List<User>>> {
   final DatabaseHelper _dbHelper;
+  final Ref _ref; // Add ref
 
-  MembersNotifier(this._dbHelper) : super(const AsyncValue.loading()) {
+  // Update constructor to accept Ref
+  MembersNotifier(this._dbHelper, this._ref)
+      : super(const AsyncValue.loading()) {
     loadUsers();
   }
 
@@ -33,7 +37,11 @@ class MembersNotifier extends StateNotifier<AsyncValue<List<User>>> {
         name: 'ปัจจัยส่วนตัว ${user.name}',
         createdAt: DateTime.now(),
       );
-      await _dbHelper.createNewMemberWithAccount(user, newAccount);
+      // Use separate calls now that the initial DB creation race condition is solved.
+      // This needs to be a transaction to ensure both succeed or fail together.
+      final newUserId = await _dbHelper.addUser(user);
+      final accountWithOwner = newAccount.copyWith(ownerUserId: newUserId);
+      await _dbHelper.addAccount(accountWithOwner);
     }
     await loadUsers(); // Refresh the list to reflect the new user
   }
@@ -56,7 +64,9 @@ class MembersNotifier extends StateNotifier<AsyncValue<List<User>>> {
 
   Future<String> resetId2(int userId) async {
     final newId2 = (1000 + Random().nextInt(9000)).toString();
-    await _dbHelper.updateUserId2(userId, newId2);
+    // Hash the new ID2 before updating the database
+    final hashedId2 = _ref.read(cryptoServiceProvider).hashString(newId2);
+    await _dbHelper.updateUserId2(userId, hashedId2);
     await loadUsers(); // Refresh the list
     return newId2;
   }
@@ -72,11 +82,14 @@ class MembersNotifier extends StateNotifier<AsyncValue<List<User>>> {
 
 final membersProvider =
     StateNotifierProvider<MembersNotifier, AsyncValue<List<User>>>((ref) {
-  return MembersNotifier(DatabaseHelper.instance);
+  // Pass ref to the constructor
+  return MembersNotifier(DatabaseHelper.instance, ref);
 });
 
-final memberByIdProvider =
-    Provider.autoDispose.family<AsyncValue<User?>, int>((ref, id) {
+final memberByIdProvider = Provider.autoDispose.family<AsyncValue<User?>, int>((
+  ref,
+  id,
+) {
   final membersAsync = ref.watch(membersProvider);
   return membersAsync.when(
     data: (members) {

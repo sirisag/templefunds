@@ -17,13 +17,22 @@ class CryptoService {
     return encrypt.Key(Uint8List.fromList(digest.bytes));
   }
 
+  /// Hashes a given string using SHA-256.
+  String hashString(String input) {
+    final bytes = utf8.encode(input);
+    final digest = crypto.sha256.convert(bytes);
+    return digest.toString();
+  }
+
   /// Encrypts the given data using AES-256 with the provided password.
   /// The output format is [16-byte IV][Encrypted Data].
   Uint8List encryptData(Uint8List data, String password) {
     final key = _deriveKey(password);
     // A new, random IV must be generated for every encryption.
     final iv = encrypt.IV.fromSecureRandom(16);
-    final encrypter = encrypt.Encrypter(encrypt.AES(key, mode: encrypt.AESMode.cbc));
+    final encrypter = encrypt.Encrypter(
+      encrypt.AES(key, mode: encrypt.AESMode.cbc),
+    );
 
     final encrypted = encrypter.encryptBytes(data, iv: iv);
 
@@ -48,8 +57,13 @@ class CryptoService {
     // The actual encrypted content is the rest of the data.
     final encryptedBytes = encryptedData.sublist(16);
 
-    final encrypter = encrypt.Encrypter(encrypt.AES(key, mode: encrypt.AESMode.cbc));
-    final decrypted = encrypter.decryptBytes(encrypt.Encrypted(encryptedBytes), iv: iv);
+    final encrypter = encrypt.Encrypter(
+      encrypt.AES(key, mode: encrypt.AESMode.cbc),
+    );
+    final decrypted = encrypter.decryptBytes(
+      encrypt.Encrypted(encryptedBytes),
+      iv: iv,
+    );
     return Uint8List.fromList(decrypted);
   }
 }

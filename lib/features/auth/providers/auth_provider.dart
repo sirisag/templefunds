@@ -1,4 +1,7 @@
 import 'dart:io';
+import 'dart:convert';
+import 'package:flutter/foundation.dart';
+import 'package:uuid/uuid.dart';
 import 'dart:math';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -6,23 +9,24 @@ import '../../../core/models/account_model.dart';
 import '../../../core/models/user_model.dart';
 import '../../../core/services/secure_storage_service.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
-//import 'package:share_plus/share_plus.dart';
 import 'package:sqflite/sqflite.dart';
-//import 'package:intl/intl.dart';
 import '../../../core/database/database_helper.dart';
 import '../../../core/services/crypto_service.dart';
+import '../../transactions/providers/accounts_provider.dart';
 import '../../settings/providers/settings_provider.dart';
 
 // Part 1: Define the possible authentication states
 enum AuthStatus {
-  initializing,   // Initial state on app start
-  loggedOut,      // Initial state, user needs to enter ID1
+  initializing, // Initial state on app start
+  loggedOut, // Initial state, user needs to enter ID1
   requiresAdminRegistration, // No DB found, new admin setup
-  requiresId2,    // ID1 was correct, now needs ID2
-  requiresPin,    // User is recognized on this device, needs PIN
+  requiresId2, // ID1 was correct, now needs ID2
+  requiresLogin, // DB exists, but no user is logged in on this device yet.
+  requiresPin, // User is recognized on this device, needs PIN
   requiresPinSetup, // First time login on this device, needs to set a PIN
-  loggedIn,       // Successfully logged in
+  loggedIn, // Successfully logged in
 }
 
 // Part 2: Define the state object that will be managed
@@ -64,41 +68,75 @@ class AuthNotifier extends StateNotifier<AuthState> {
   final DatabaseHelper _dbHelper;
   final SecureStorageService _secureStorage;
 
-  AuthNotifier(this._ref, this._dbHelper, this._secureStorage) : super(AuthState()) {
+  AuthNotifier(this._ref, this._dbHelper, this._secureStorage)
+      : super(AuthState()) {
     _init();
   }
 
   Future<void> _init() async {
+    debugPrint("[Auth] Initializing authentication state...");
     // Check for an existing lockout on app start
     if (await _isCurrentlyLockedOut()) {
+      debugPrint("[Auth] User is currently locked out. Initialization halted.");
       return;
     }
 
     try {
+      debugPrint("[Auth] Reading last user ID from secure storage...");
       final lastUserId = await _secureStorage.getLastUserId();
+      debugPrint("[Auth] Found last user ID: $lastUserId");
       final lastDbExport = await _secureStorage.getLastDbExportTimestamp();
       // A PIN is considered set if we have a last user ID.
       if (lastUserId != null) {
+        debugPrint(
+          "[Auth] Fetching user data from database for ID: $lastUserId",
+        );
         final user = await _dbHelper.getUserById(lastUserId);
         if (user != null) {
           // User is recognized, go straight to the PIN screen
+          debugPrint("[Auth] User found. Setting state to requiresPin.");
           state = state.copyWith(
-              status: AuthStatus.requiresPin,
-              user: user,
-              lastDbExport: lastDbExport);
+            status: AuthStatus.requiresPin,
+            user: user,
+            lastDbExport: lastDbExport,
+          );
         } else {
+          debugPrint(
+            "[Auth] User ID found in storage, but not in DB. Forcing logout.",
+          );
           // Data inconsistency (e.g., new DB imported), force full logout
           await logout();
         }
       } else {
-        // No user saved, normal logged-out state
-        state =
-            state.copyWith(status: AuthStatus.loggedOut, lastDbExport: lastDbExport);
+        // No user saved on this device. Check if a database exists.
+        final dbPath = await getDatabasesPath();
+        final path = p.join(dbPath, 'temple_funds.db');
+        final dbExists = await databaseExists(path);
+
+        if (dbExists) {
+          // DB exists, but no user logged in here. Go to the generic login screen.
+          // FIX: Change the state to loggedOut to show the WelcomeScreen first,
+          // instead of forcing the LoginScreen. The user can then choose to log in.
+          debugPrint(
+              "[Auth] DB exists, but no user saved. Setting state to loggedOut.");
+          state = state.copyWith(
+              status: AuthStatus.loggedOut, lastDbExport: lastDbExport);
+        } else {
+          // No DB, no user. This is a fresh install.
+          debugPrint("[Auth] No DB or user found. Setting state to loggedOut.");
+          state = state.copyWith(
+              status: AuthStatus.loggedOut, lastDbExport: lastDbExport);
+        }
       }
     } catch (e) {
       // Error during init, default to logged out
-      state = state.copyWith(status: AuthStatus.loggedOut, errorMessage: 'เกิดข้อผิดพลาดในการเริ่มต้น');
+      debugPrint("[Auth] Error during initialization: $e");
+      state = state.copyWith(
+        status: AuthStatus.loggedOut,
+        errorMessage: 'เกิดข้อผิดพลาดในการเริ่มต้น',
+      );
     }
+    debugPrint("[Auth] Initialization complete. Final status: ${state.status}");
   }
 
   /// Checks if the user is currently locked out and updates the state if so.
@@ -125,7 +163,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
     if (newFailureCount >= lockoutThreshold) {
       // Lockout duration increases by 1 minute for each failure after the 2nd.
       final lockoutMinutes = newFailureCount - (lockoutThreshold - 1);
-      final lockoutEndTime = DateTime.now().add(Duration(minutes: lockoutMinutes));
+      final lockoutEndTime = DateTime.now().add(
+        Duration(minutes: lockoutMinutes),
+      );
       await _secureStorage.setLockoutEndTime(lockoutEndTime);
       state = state.copyWith(
         // Keep current status, but show lockout info
@@ -141,59 +181,18 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
-  /// This is the main entry point from the WelcomeScreen.
-  /// It checks if a database exists to decide if this is a first-time Admin setup
-  /// or a login attempt for an existing database.
-  Future<void> processId1(String userId1) async {
-    if (await _isCurrentlyLockedOut()) return;
-    try {
-      // We need to check if the database file already exists on the device.
-      final dbPath = await getDatabasesPath();
-      final path = p.join(dbPath, 'temple_funds.db');
-      final dbExists = await databaseExists(path);
-
-      if (dbExists) {
-        // Database exists, so this is a login attempt.
-        final user = await _dbHelper.getUserByUserId1(userId1);
-        if (user == null) {
-          throw Exception('ไม่พบผู้ใช้งานรหัสนี้ในไฟล์ข้อมูล');
-        }
-        // User found, now we need ID2
-        await _secureStorage.resetLoginFailureCount();
-        state = state.copyWith(status: AuthStatus.requiresId2, user: user, errorMessage: null, lockoutUntil: null);
-      } else {
-        // No database, this is a new Admin registration flow.
-        final tempAdmin = User(userId1: userId1, userId2: '', name: '', role: UserRole.Admin, createdAt: DateTime.now());
-        state = state.copyWith(status: AuthStatus.requiresAdminRegistration, user: tempAdmin, errorMessage: null, lockoutUntil: null);
-      }
-    } catch (e) {
-      await _handleLoginFailure(baseErrorMessage: e.toString().replaceFirst("Exception: ", ""));
-    }
-  }
-
-  // This would be called from the ID2 verification screen
-  Future<void> verifyId2(String userId2) async {
-    if (await _isCurrentlyLockedOut()) return;
-    if (state.user == null) return;
-
-    if (state.user!.userId2 == userId2) {
-      // ID2 is correct! Move to PIN setup.
-      await _secureStorage.resetLoginFailureCount();
-      state = state.copyWith(status: AuthStatus.requiresPinSetup, errorMessage: null, lockoutUntil: null);
-    } else {
-      // Handle failure. The _handleLoginFailure method will update the state
-      // with an error message and potential lockout, while keeping the status as requiresId2.
-      await _handleLoginFailure(baseErrorMessage: 'รหัสยืนยันตัวตนไม่ถูกต้อง');
-    }
-  }
-
   // This would be called from the PIN screen
   Future<void> setPinAndLogin(String pin) async {
     if (state.user?.id == null) return; // Should not happen, but good practice
     await _secureStorage.resetLoginFailureCount(); // Reset on successful setup
     await _secureStorage.savePin(pin);
     await _secureStorage.saveLastUserId(state.user!.id!);
-    state = state.copyWith(status: AuthStatus.loggedIn, user: state.user, errorMessage: null, lockoutUntil: null);
+    state = state.copyWith(
+      status: AuthStatus.loggedIn,
+      user: state.user,
+      errorMessage: null,
+      lockoutUntil: null,
+    );
   }
 
   // This would be called from the PIN screen
@@ -203,53 +202,118 @@ class AuthNotifier extends StateNotifier<AuthState> {
     final isPinCorrect = await _secureStorage.verifyPin(pin);
     if (isPinCorrect) {
       await _secureStorage.resetLoginFailureCount();
-      state = state.copyWith(status: AuthStatus.loggedIn, user: state.user, errorMessage: null, lockoutUntil: null);
+      // Explicitly set the status to loggedIn on successful PIN verification.
+      // The previous code was missing this, causing the UI to get stuck.
+      state = AuthState(
+        status: AuthStatus.loggedIn,
+        user: state.user,
+        errorMessage: null,
+        lockoutUntil: null,
+        lastDbExport: state.lastDbExport,
+      );
     } else {
       await _handleLoginFailure(baseErrorMessage: 'PIN ไม่ถูกต้อง');
     }
   }
 
-  /// Completes the registration for a new Admin.
-  Future<void> completeAdminRegistration(String name, String templeName) async {
-    if (state.user == null || state.status != AuthStatus.requiresAdminRegistration) return;
-
+  /// New method for the combined login screen.
+  Future<void> loginWithIds({required String id1, required String id2}) async {
+    if (await _isCurrentlyLockedOut()) return;
     try {
-      // Generate a random 4-digit ID2
-      final id2 = (1000 + Random().nextInt(9000)).toString();
-      
-      // Create a user object without an ID first
+      final user = await _dbHelper.getUserByUserId1(id1);
+      if (user == null) {
+        throw Exception('ไม่พบผู้ใช้งานรหัสนี้');
+      }
+
+      // Hash the provided ID2 and compare
+      final hashedId2 = _ref.read(cryptoServiceProvider).hashString(id2);
+      if (user.userId2 != hashedId2) {
+        throw Exception('รหัสยืนยันตัวตนไม่ถูกต้อง');
+      }
+
+      // Credentials are correct
+      await _secureStorage.resetLoginFailureCount();
+      state = state.copyWith(
+        status: AuthStatus.requiresPinSetup,
+        user: user,
+        errorMessage: null,
+        lockoutUntil: null,
+      );
+    } catch (e) {
+      await _handleLoginFailure(
+        baseErrorMessage: e.toString().replaceFirst("Exception: ", ""),
+      );
+    }
+  }
+
+  /// New method for the temple registration screen.
+  Future<String?> registerNewTemple({
+    required String templeName,
+    required String adminName,
+    required String adminId1,
+    required String pin,
+    File? logoImageFile,
+  }) async {
+    try {
+      // Force delete any existing database file and close any open connections.
+      // This ensures a completely fresh start, mimicking the "reset" functionality
+      // and preventing issues with stale database handles.
+      await _dbHelper.deleteDatabaseFile();
+
+      // 1. Create Admin User
+      final adminId2 = (1000 + Random().nextInt(9000)).toString();
+      final hashedAdminId2 =
+          _ref.read(cryptoServiceProvider).hashString(adminId2);
       var adminUser = User(
-        userId1: state.user!.userId1,
-        userId2: id2,
-        name: name,
+        userId1: adminId1,
+        userId2: hashedAdminId2,
+        name: adminName,
         role: UserRole.Admin,
         createdAt: DateTime.now(),
       );
 
-      // This will create the DB and the user, and return the new ID
-      final newId = await _dbHelper.addUser(adminUser); // This creates the user table
+      // 3. Initialize the entire database with the first admin user and temple account
+      // This new method in DatabaseHelper will handle everything in a single transaction.
+      await _dbHelper.initializeNewDatabaseWithAdmin(
+          adminUser: adminUser, templeName: templeName);
 
-      // Also create the central temple account
-      final templeAccount = Account(
-        name: 'กองกลางวัด',
-        ownerUserId: null, // No specific owner
-        createdAt: DateTime.now(),
-      );
-      await _dbHelper.addAccount(templeAccount);
+      // 4. NOW that the DB is created, fetch the newly created user to get their ID.
+      final newlyCreatedUser = await _dbHelper.getUserByUserId1(adminId1);
+      // We assert that newlyCreatedUser is not null because we just created it.
+      // This resolves the unnecessary_null_comparison lint.
+      final newAdminId = newlyCreatedUser!.id!;
 
-      // Save the temple name to metadata
-      await _dbHelper.setAppMetadata('temple_name', templeName);
+      // If a logo is provided, save it using the centralized homeStyleProvider.
+      if (logoImageFile != null) {
+        await _ref
+            .read(homeStyleProvider.notifier)
+            .updateAndSaveStyle(imageFile: logoImageFile);
+      }
 
-      // Invalidate the provider so other parts of the app get the new name
+      // Invalidate providers to force UI refresh
       _ref.invalidate(templeNameProvider);
+      _ref.invalidate(allAccountsProvider);
 
-      // Update the user object with the ID from the database
-      adminUser = adminUser.copyWith(id: newId);
+      // 5. Set user object with new ID
+      adminUser = adminUser.copyWith(id: newAdminId);
 
-      // Update state to the final user object and move to PIN setup
-      state = state.copyWith(status: AuthStatus.requiresPinSetup, user: adminUser, errorMessage: null);
+      // 6. Save PIN and log in
+      await _secureStorage.savePin(pin);
+      await _secureStorage.saveLastUserId(newAdminId);
+
+      // 7. Update state to loggedIn
+      state = state.copyWith(
+        status: AuthStatus.loggedIn,
+        user: adminUser,
+        errorMessage: null,
+      );
+      return adminId2; // Return the generated ID2 on success
     } catch (e) {
-      state = state.copyWith(status: AuthStatus.loggedOut, errorMessage: 'เกิดข้อผิดพลาดในการสร้างบัญชีผู้ดูแล');
+      state = state.copyWith(
+        status: AuthStatus.loggedOut,
+        errorMessage: 'เกิดข้อผิดพลาดในการสร้างบัญชีผู้ดูแล',
+      );
+      return null; // Return null on failure
     }
   }
 
@@ -258,11 +322,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
     File? tempFile;
     try {
       // 1. Pick the file
-      final result = await FilePicker.platform.pickFiles(
-        type: FileType.any,
-      );
+      final result = await FilePicker.platform.pickFiles(type: FileType.any);
 
-      if (result == null || result.files.single.path == null ) {
+      if (result == null || result.files.single.path == null) {
         return false; // User canceled
       }
 
@@ -288,16 +350,34 @@ class AuthNotifier extends StateNotifier<AuthState> {
       if (match == null || match.group(1) == null) {
         throw Exception('ชื่อไฟล์ไม่ถูกต้อง ไม่สามารถถอดรหัสได้');
       }
-      final timestampKey = match.group(1)!.replaceAll('_', ''); // Key is yyyyMMddHHmm
+      final timestampKey =
+          match.group(1)!.replaceAll('_', ''); // Key is yyyyMMddHHmm
 
       final cryptoService = _ref.read(cryptoServiceProvider);
-      final decryptedBytes = cryptoService.decryptData(encryptedBytes, timestampKey);
+      final decryptedJsonBytes = cryptoService.decryptData(
+        encryptedBytes,
+        timestampKey,
+      );
+
+      // Decode the JSON and validate the Temple ID
+      final jsonString = utf8.decode(decryptedJsonBytes);
+      final importData = jsonDecode(jsonString);
+      final importMetadata = importData['metadata'];
+      final importTempleId = importMetadata['temple_id'];
+
+      final currentTempleId = await _dbHelper.getAppMetadata('temple_id');
+
+      // This is the crucial check. If the app has a temple ID, it must match the file's ID.
+      if (currentTempleId != null && importTempleId != currentTempleId) {
+        throw Exception('ไฟล์สำรองข้อมูลนี้เป็นของวัดอื่น ไม่สามารถนำเข้าได้');
+      }
+
       // 4. Define paths and write decrypted data to a temporary file for validation
       final dbDirectoryPath = await getDatabasesPath();
       final appDbPath = p.join(dbDirectoryPath, 'temple_funds.db');
       final tempDbPath = p.join(dbDirectoryPath, 'import_temp.db');
       tempFile = File(tempDbPath);
-      await tempFile.writeAsBytes(decryptedBytes);
+      await tempFile.writeAsBytes(base64Decode(importData['data']));
 
       // 5. Validate the structure of the temporary database file
       await _dbHelper.validateDatabaseFile(tempDbPath);
@@ -325,10 +405,19 @@ class AuthNotifier extends StateNotifier<AuthState> {
     } catch (e) {
       final errorString = e.toString();
       // Check for common decryption error messages
-      if (errorString.contains('Invalid argument(s): Invalid or corrupted pad block') || errorString.contains('bad padding')) {
-        state = state.copyWith(errorMessage: 'นำเข้าไฟล์ไม่สำเร็จ: รหัสผ่านไม่ถูกต้อง หรือไฟล์เสียหาย');
+      if (errorString.contains(
+            'Invalid argument(s): Invalid or corrupted pad block',
+          ) ||
+          errorString.contains('bad padding')) {
+        state = state.copyWith(
+          errorMessage:
+              'นำเข้าไฟล์ไม่สำเร็จ: รหัสผ่านไม่ถูกต้อง หรือไฟล์เสียหาย',
+        );
       } else {
-        state = state.copyWith(errorMessage: 'นำเข้าไฟล์ไม่สำเร็จ: ${errorString.replaceFirst("Exception: ", "")}');
+        state = state.copyWith(
+          errorMessage:
+              'นำเข้าไฟล์ไม่สำเร็จ: ${errorString.replaceFirst("Exception: ", "")}',
+        );
       }
       return false;
     } finally {
@@ -354,12 +443,13 @@ class AuthNotifier extends StateNotifier<AuthState> {
     // No need to save last user ID again, it's the same user.
   }
 
-  /// Allows the user to go back from the ID2 screen to the ID1 screen.
-  Future<void> goBackToId1Screen() async {
-    // This resets the auth flow state without deleting the stored PIN or last user ID.
+  /// Allows the user to go back from the PIN screen to the Welcome screen.
+  Future<void> goBackToWelcomeScreen() async {
+    // This resets the auth flow state but keeps the PIN and last user ID stored.
+    // So if the user closes the app and re-opens, it will ask for PIN again.
     state = AuthState(
       status: AuthStatus.loggedOut,
-      user: null,
+      user: null, // Clear the partially logged-in user
       errorMessage: null,
       lockoutUntil: null,
       lastDbExport: state.lastDbExport,
@@ -370,7 +460,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Future<void> resetApp() async {
     await _secureStorage.deleteAll();
     await _dbHelper.deleteDatabaseFile();
-    state = AuthState(status: AuthStatus.loggedOut); // Reset to a clean loggedOut state
+    state = AuthState(
+      status: AuthStatus.loggedOut,
+    ); // Reset to a clean loggedOut state
   }
 
   /// Saves the timestamp of the last successful DB export.
@@ -380,8 +472,13 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   Future<void> logout() async {
-    await _secureStorage.deleteAll();
-    state = AuthState(status: AuthStatus.loggedOut); // Reset to a clean loggedOut state
+    // FIX: Use `deleteAuthCredentials` to only remove PIN and user ID,
+    // preserving other settings like logo size which are also in secure storage.
+    await _secureStorage.deleteAuthCredentials();
+    // After deleting credentials, simply reset the state to loggedOut.
+    // The AuthWrapper will then show the appropriate screen (WelcomeScreen or LoginScreen)
+    // on the next app start, which is the correct behavior.
+    state = AuthState(status: AuthStatus.loggedOut);
   }
 
   /// Clears any existing error message from the state.

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
@@ -6,6 +7,8 @@ import 'package:sqflite/sqflite.dart';
 import '../providers/auth_provider.dart';
 import '../widgets/login_error_dialog.dart';
 import '../../members/providers/members_provider.dart';
+import 'login_screen.dart';
+import 'temple_registration_screen.dart';
 import '../../transactions/providers/accounts_provider.dart';
 import '../../settings/providers/settings_provider.dart';
 import '../../transactions/providers/transactions_provider.dart';
@@ -18,14 +21,16 @@ class WelcomeScreen extends ConsumerStatefulWidget {
 }
 
 class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
-  final _idController = TextEditingController();
-  final _formKey = GlobalKey<FormState>();
   bool _isLoading = false;
   bool _dbExists = false;
 
   @override
   void initState() {
     super.initState();
+    // Clear the image cache on init to ensure the latest logo is displayed,
+    // preventing issues where an old cached logo is shown after an update.
+    PaintingBinding.instance.imageCache.clear();
+    PaintingBinding.instance.imageCache.clearLiveImages();
     _checkDbStatus();
   }
 
@@ -35,33 +40,6 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
     final exists = await databaseExists(path);
     if (mounted) {
       setState(() => _dbExists = exists);
-    }
-  }
-
-  @override
-  void dispose() {
-    _idController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _submit() async {
-    if (_isLoading) return;
-    if (!_formKey.currentState!.validate()) {
-      return;
-    }
-    setState(() {
-      _isLoading = true;
-    });
-
-    // Call the provider method to process the ID
-    await ref.read(authProvider.notifier).processId1(_idController.text.trim());
-
-    // The AuthWrapper in main.dart will handle navigation based on the new state.
-    // We just need to handle the loading state on this screen.
-    if (mounted) {
-      setState(() {
-        _isLoading = false;
-      });
     }
   }
 
@@ -171,6 +149,7 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
       }
     });
     final templeNameAsync = ref.watch(templeNameProvider);
+    final homeStyleAsync = ref.watch(homeStyleProvider);
 
     return Scaffold(
       body: SafeArea(
@@ -181,100 +160,122 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
               Expanded(
                 child: Center(
                   child: SingleChildScrollView(
-                    child: Form(
-                      key: _formKey,
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const SizedBox(height: 8),
-                          Padding(
-                            // This creates a 25% margin on the left and right,
-                            // making the image take up 50% of the screen width and centering it.
-                            padding: EdgeInsets.fromLTRB(
-                              MediaQuery.of(context).size.width *
-                                  0.15, // Left margin
-                              8, // Top spacing
-                              MediaQuery.of(context).size.width *
-                                  0.15, // Right margin
-                              16, // Bottom spacing
-                            ),
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(
-                                100.0,
-                              ), // Creates rounded corners
-                              child: Image.asset('assets/icon/icon.png'),
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            'แอปพลิเคชั่น',
-                            style: Theme.of(context).textTheme.headlineMedium,
-                          ),
-                          Text(
-                            'บันทึกรายการบัญชีวัด',
-                            style: Theme.of(context).textTheme.headlineMedium,
-                          ),
-                          templeNameAsync.when(
-                            data: (name) => (name != null && name.isNotEmpty)
-                                ? Padding(
-                                    padding: const EdgeInsets.only(top: 8.0),
-                                    child: Text(
-                                      name,
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .titleLarge
-                                          ?.copyWith(
-                                            color: Theme.of(
-                                              context,
-                                            ).colorScheme.secondary,
-                                          ),
-                                      textAlign: TextAlign.center,
-                                    ),
-                                  )
-                                : const SizedBox.shrink(),
-                            loading: () => const SizedBox.shrink(),
-                            error: (e, s) => const SizedBox.shrink(),
-                          ),
-                          const SizedBox(height: 40),
-                          TextFormField(
-                            controller: _idController,
-                            decoration: const InputDecoration(
-                              labelText: 'รหัสประจำตัว (4 หลัก)',
-                              border: OutlineInputBorder(),
-                              prefixIcon: Icon(Icons.person_outline),
-                              counterText: "", // Hide the counter
-                            ),
-                            keyboardType: TextInputType.number,
-                            inputFormatters: [
-                              FilteringTextInputFormatter.digitsOnly,
-                            ],
-                            maxLength: 4,
-                            validator: (value) {
-                              if (value == null || value.trim().length != 4) {
-                                return 'กรุณากรอกรหัส 4 หลัก';
-                              }
-                              return null;
-                            },
-                          ),
-                          const SizedBox(height: 24),
-                          _isLoading
-                              ? const CircularProgressIndicator()
-                              : ElevatedButton.icon(
-                                  onPressed: _submit,
-                                  icon: const Icon(Icons.login),
-                                  label: const Text('ตกลง'),
-                                  style: ElevatedButton.styleFrom(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 40,
-                                      vertical: 16,
-                                    ),
-                                    textStyle: Theme.of(
-                                      context,
-                                    ).textTheme.titleMedium,
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const SizedBox(height: 8),
+                        homeStyleAsync.when(
+                          data: (style) {
+                            ImageProvider imageProvider;
+                            if (style.imagePath != null &&
+                                File(style.imagePath!).existsSync()) {
+                              imageProvider = FileImage(File(style.imagePath!));
+                            } else {
+                              imageProvider =
+                                  const AssetImage('assets/icon/icon.png');
+                            }
+
+                            final horizontalPadding =
+                                (1 - style.widthMultiplier) / 2;
+
+                            return Padding(
+                              padding: EdgeInsets.symmetric(
+                                  horizontal:
+                                      MediaQuery.of(context).size.width *
+                                          horizontalPadding),
+                              child: ClipRRect(
+                                borderRadius:
+                                    BorderRadius.circular(style.cornerRadius),
+                                child: Container(
+                                  width: MediaQuery.of(context).size.width *
+                                      style.widthMultiplier,
+                                  height: MediaQuery.of(context).size.width *
+                                      style.heightMultiplier,
+                                  decoration: BoxDecoration(
+                                    image: DecorationImage(
+                                        fit: BoxFit.cover,
+                                        image: imageProvider),
                                   ),
                                 ),
-                        ],
-                      ),
+                              ),
+                            );
+                          },
+                          loading: () => const CircularProgressIndicator(),
+                          error: (e, s) => const Icon(Icons.error, size: 80),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'แอปพลิเคชั่น',
+                          style: Theme.of(context).textTheme.headlineMedium,
+                        ),
+                        Text(
+                          'บันทึกรายการบัญชีวัด',
+                          style: Theme.of(context).textTheme.headlineMedium,
+                        ),
+                        templeNameAsync.when(
+                          data: (name) => (name != null && name.isNotEmpty)
+                              ? Padding(
+                                  padding: const EdgeInsets.only(top: 8.0),
+                                  child: Text(
+                                    name,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleLarge
+                                        ?.copyWith(
+                                          color: Theme.of(
+                                            context,
+                                          ).colorScheme.secondary,
+                                        ),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                )
+                              : const SizedBox.shrink(),
+                          loading: () => const SizedBox.shrink(),
+                          error: (e, s) => const SizedBox.shrink(),
+                        ),
+                        const SizedBox(height: 24),
+                        _isLoading
+                            ? const CircularProgressIndicator()
+                            : Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  ElevatedButton.icon(
+                                    onPressed: () {
+                                      Navigator.of(context)
+                                          .push(MaterialPageRoute(
+                                        builder: (_) => const LoginScreen(),
+                                      ));
+                                    },
+                                    icon: const Icon(Icons.login),
+                                    label: const Text('เข้าสู่ระบบ'),
+                                    style: ElevatedButton.styleFrom(
+                                      padding: const EdgeInsets.symmetric(
+                                          vertical: 16),
+                                      textStyle: Theme.of(context)
+                                          .textTheme
+                                          .titleMedium,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 12),
+                                  OutlinedButton.icon(
+                                    onPressed: () {
+                                      Navigator.of(context)
+                                          .push(MaterialPageRoute(
+                                        builder: (_) =>
+                                            const TempleRegistrationScreen(),
+                                      ));
+                                    },
+                                    icon: const Icon(Icons.app_registration),
+                                    label: const Text(
+                                        'ลงทะเบียนวัด (สำหรับผู้ดูแล)'),
+                                    style: OutlinedButton.styleFrom(
+                                      padding: const EdgeInsets.symmetric(
+                                          vertical: 12),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                      ],
                     ),
                   ),
                 ),

@@ -9,6 +9,7 @@ import 'package:templefunds/core/widgets/app_dialogs.dart';
 import 'package:templefunds/core/widgets/navigation_tile.dart';
 import 'package:templefunds/features/auth/providers/auth_provider.dart';
 import 'package:templefunds/core/services/db_export_service.dart';
+import 'package:templefunds/features/home/screens/settings_screen.dart';
 import 'package:templefunds/features/members/screens/member_management_screen.dart';
 import 'package:templefunds/features/members/providers/members_provider.dart';
 import 'package:templefunds/features/settings/providers/settings_provider.dart';
@@ -18,6 +19,7 @@ import 'package:templefunds/features/transactions/providers/transactions_provide
 import 'package:templefunds/features/transactions/screens/add_multi_transaction_screen.dart';
 import 'package:templefunds/features/transactions/screens/temple_transactions_screen.dart';
 import 'package:templefunds/features/transactions/screens/members_transactions_screen.dart';
+import 'package:templefunds/features/settings/screens/settings_screen.dart';
 
 class AdminHomeScreen extends ConsumerWidget {
   const AdminHomeScreen({super.key});
@@ -72,8 +74,7 @@ class AdminHomeScreen extends ConsumerWidget {
 
   void _showExportResultSnackBar(BuildContext context, bool success) {
     if (!context.mounted) return;
-    final message =
-        success ? 'ส่งออกข้อมูลสำเร็จ' : 'ส่งออกข้อมูลไม่สำเร็จ';
+    final message = success ? 'ส่งออกข้อมูลสำเร็จ' : 'ส่งออกข้อมูลไม่สำเร็จ';
     final backgroundColor =
         success ? Colors.green : Theme.of(context).colorScheme.error;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -109,12 +110,20 @@ class AdminHomeScreen extends ConsumerWidget {
               'ไวยาวัจกรณ์: ${user?.name ?? ''} (ID: ${user?.userId1 ?? ''})',
               style: TextStyle(
                   fontSize: 14,
-                  color: const Color.fromARGB(255, 20, 20, 20)
-                      .withOpacity(0.9)),
+                  color:
+                      const Color.fromARGB(255, 20, 20, 20).withOpacity(0.9)),
             ),
           ],
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.settings_outlined),
+            tooltip: 'ตั้งค่า',
+            onPressed: () {
+              Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const SettingsScreen()));
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.logout),
             tooltip: 'ออกจากระบบ',
@@ -149,13 +158,9 @@ class AdminHomeScreen extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
-
-
-        
         children: [
           const Text('เมนูหลัก',
-              style:
-                  TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),
           NavigationTile(
             icon: Icons.account_balance_outlined,
@@ -200,8 +205,8 @@ class AdminHomeScreen extends ConsumerWidget {
                       child: SizedBox(
                           height: 40,
                           child: CircularProgressIndicator(strokeWidth: 2))),
-                  error: (err, stack) =>
-                      const Center(child: Icon(Icons.error_outline, color: Colors.red)),
+                  error: (err, stack) => const Center(
+                      child: Icon(Icons.error_outline, color: Colors.red)),
                   data: (summary) => _buildBalanceDisplay(
                     context,
                     label: 'ยอดเงินวัด',
@@ -268,9 +273,12 @@ class AdminHomeScreen extends ConsumerWidget {
                     icon: const Icon(Icons.backup_outlined, size: 32),
                     label: const Text('ส่งออกไฟล์'),
                     style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal:8),
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
                       side: BorderSide(
-                        color: Theme.of(context).colorScheme.primary.withOpacity(0.5),
+                        color: Theme.of(context)
+                            .colorScheme
+                            .primary
+                            .withOpacity(0.5),
                       ),
                     ),
                   ),
@@ -285,10 +293,14 @@ class AdminHomeScreen extends ConsumerWidget {
                     onPressed: () => Navigator.of(context).push(
                         MaterialPageRoute(
                             builder: (_) => const AddMultiTransactionScreen())),
-                    icon: const Icon(Icons.add_card_outlined,size: 32,),
+                    icon: const Icon(
+                      Icons.add_card_outlined,
+                      size: 32,
+                    ),
                     label: const Text('ทำธุรกรรม'),
                     style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 12),
                     ),
                   ),
                 ),
@@ -306,7 +318,8 @@ class AdminHomeScreen extends ConsumerWidget {
         child: Text(
           'ยังไม่เคยสำรองข้อมูล',
           textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 12, color: Color.fromARGB(255, 172, 171, 171)),
+          style: TextStyle(
+              fontSize: 12, color: Color.fromARGB(255, 172, 171, 171)),
         ),
       );
     }
@@ -316,13 +329,43 @@ class AdminHomeScreen extends ConsumerWidget {
         children: [
           Text('สำรองล่าสุด:', style: Theme.of(context).textTheme.labelSmall),
           Text(
-            DateFormatter.formatBE(lastExportDate.toLocal(), "d MMM yy (HH:mm'น.')"),
+            DateFormatter.formatBE(
+                lastExportDate.toLocal(), "d MMM yy (HH:mm'น.')"),
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.bold,
               color: const Color.fromARGB(255, 129, 129, 129),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBalanceDisplay(
+    BuildContext context, {
+    required String label,
+    required double amount,
+    required Color color,
+  }) {
+    final formatter = NumberFormat("#,##0", "th_TH");
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 2.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(label, style: Theme.of(context).textTheme.labelMedium),
+          Text(
+            '฿${formatter.format(amount)}',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),
@@ -382,10 +425,8 @@ class AdminHomeScreen extends ConsumerWidget {
           child: ListTile(
             leading: CircleAvatar(
               backgroundColor: amountColor.withOpacity(0.1),
-              child: Icon(
-                  isIncome ? Icons.arrow_downward : Icons.arrow_upward,
-                  color: amountColor,
-                  size: 20),
+              child: Icon(isIncome ? Icons.arrow_downward : Icons.arrow_upward,
+                  color: amountColor, size: 20),
             ),
             title: Text(
               transaction.description ?? 'ไม่มีคำอธิบาย',
@@ -420,7 +461,9 @@ class AdminHomeScreen extends ConsumerWidget {
                       )
                   else
                     const TextSpan(text: 'ไม่พบบัญชี'),
-                  TextSpan(text: ' ${DateFormatter.formatBE(transaction.transactionDate.toLocal(), "d MMM yyyy (HH:mm'น.')")}'),
+                  TextSpan(
+                      text:
+                          ' ${DateFormatter.formatBE(transaction.transactionDate.toLocal(), "d MMM yyyy (HH:mm'น.')")}'),
                 ],
               ),
             ),
@@ -431,35 +474,6 @@ class AdminHomeScreen extends ConsumerWidget {
           ),
         );
       },
-    );
-  }
-
-  Widget _buildBalanceDisplay(
-    BuildContext context, {
-    required String label,
-    required double amount,
-    required Color color,
-  }) {
-    final formatter = NumberFormat("#,##0", "th_TH");
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 2.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(label, style: Theme.of(context).textTheme.labelMedium),
-          Text(
-            '฿${formatter.format(amount)}',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: color,
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
-      ),
     );
   }
 }

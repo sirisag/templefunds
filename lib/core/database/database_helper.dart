@@ -1,5 +1,6 @@
 import 'package:path/path.dart' as p;
 import 'package:sqflite/sqflite.dart' hide Transaction;
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/account_model.dart';
 import '../models/user_model.dart';
@@ -11,18 +12,35 @@ class DatabaseHelper {
 
   static Database? _database;
 
+  // Static properties to hold initial data for the very first creation.
+  // This is a workaround to pass data into the `_onCreate` callback.
+  static User? _initialAdminUser;
+  static String? _initialTempleName;
+
   // Getter for the database. If it doesn't exist, it will be initialized.
   Future<Database> get database async {
     // If database is not null and is open, return it. Otherwise, initialize it.
     if (_database != null && _database!.isOpen) return _database!;
-    _database = await _initDB();
+    // Pass the static variables to _initDB. If they are null (normal operation),
+    // _initDB will handle it. This ensures that during the first creation,
+    // the data is passed correctly.
+    _database = await _initDB(
+        initialAdmin: _initialAdminUser, initialTempleName: _initialTempleName);
     return _database!;
   }
 
   // --- Database Initialization ---
 
-  /// Initializes the database by opening it or creating it if it doesn't exist.
-  Future<Database> _initDB() async {
+  /// Initializes the database. If this is the first time, it uses the static
+  /// properties `_initialAdminUser` and `_initialTempleName` within `_onCreate`.
+  Future<Database> _initDB(
+      {User? initialAdmin, String? initialTempleName}) async {
+    // Store the initial data in static variables before opening the database.
+    if (initialAdmin != null && initialTempleName != null) {
+      _initialAdminUser = initialAdmin;
+      _initialTempleName = initialTempleName;
+    }
+
     final dbPath = await getDatabasesPath();
     final path = p.join(dbPath, 'temple_funds.db');
 
@@ -33,7 +51,7 @@ class DatabaseHelper {
     );
   }
 
-    /// Deletes the entire database file from the device.
+  /// Deletes the entire database file from the device.
   Future<void> deleteDatabaseFile() async {
     // First, ensure the database is closed to release any file locks.
     await close();
@@ -50,24 +68,32 @@ class DatabaseHelper {
     Database? db;
     try {
       db = await openDatabase(path, readOnly: true);
-      const requiredTables = {'users', 'accounts', 'transactions', 'app_metadata'};
-      final tablesResult = await db.rawQuery("SELECT name FROM sqlite_master WHERE type='table'");
-      final existingTables = tablesResult.map((row) => row['name'] as String).toSet();
+      const requiredTables = {
+        'users',
+        'accounts',
+        'transactions',
+        'app_metadata'
+      };
+      final tablesResult = await db
+          .rawQuery("SELECT name FROM sqlite_master WHERE type='table'");
+      final existingTables =
+          tablesResult.map((row) => row['name'] as String).toSet();
 
       final missingTables = requiredTables.difference(existingTables);
 
       if (missingTables.isNotEmpty) {
-        throw Exception('ไฟล์ข้อมูลไม่ถูกต้อง (ขาดตาราง: ${missingTables.join(', ')})');
+        throw Exception(
+            'ไฟล์ข้อมูลไม่ถูกต้อง (ขาดตาราง: ${missingTables.join(', ')})');
       }
     } catch (e) {
       // Re-throw our specific exception or a more generic one if it's not ours.
       if (e.toString().contains('ขาดตาราง')) rethrow;
-      throw Exception('ไม่สามารถเปิดไฟล์ข้อมูลได้ อาจเป็นไฟล์ที่เสียหายหรือไม่ใช่ไฟล์ฐานข้อมูล');
+      throw Exception(
+          'ไม่สามารถเปิดไฟล์ข้อมูลได้ อาจเป็นไฟล์ที่เสียหายหรือไม่ใช่ไฟล์ฐานข้อมูล');
     } finally {
       await db?.close();
     }
   }
-
 
   /// This method is called only when the database is created for the first time.
   /// It creates all the necessary tables.
@@ -118,6 +144,28 @@ class DatabaseHelper {
       )
     ''');
     await batch.commit(noResult: true);
+
+    // After creating tables, if we have initial data, insert it now.
+    if (_initialAdminUser != null && _initialTempleName != null) {
+      // Insert Admin User
+      await db.insert('users', _initialAdminUser!.toMap());
+
+      // Create and Insert Temple Account
+      final templeAccount = Account(
+        name: 'กองกลางวัด',
+        ownerUserId: null, // No specific owner
+        createdAt: DateTime.now(),
+      );
+      await db.insert('accounts', templeAccount.toMap());
+
+      // Set Temple Name
+      await db.insert(
+          'app_metadata', {'key': 'temple_name', 'value': _initialTempleName!});
+
+      // Clean up static variables
+      _initialAdminUser = null;
+      _initialTempleName = null;
+    }
   }
 
   // --- CRUD Methods for 'app_metadata' table ---
@@ -135,8 +183,8 @@ class DatabaseHelper {
   /// Retrieves a value from the metadata table by its key.
   Future<String?> getAppMetadata(String key) async {
     final db = await instance.database;
-    final result =
-        await db.query('app_metadata', where: 'key = ?', whereArgs: [key], limit: 1);
+    final result = await db.query('app_metadata',
+        where: 'key = ?', whereArgs: [key], limit: 1);
     if (result.isNotEmpty) {
       return result.first['value'] as String?;
     }
@@ -158,27 +206,28 @@ class DatabaseHelper {
     return List.generate(maps.length, (i) => Account.fromMap(maps[i]));
   }
 
-  // --- Transactional Operations ---
-
-  /// Creates a new member and their personal account within a single transaction.
-  /// This ensures that both operations succeed or both fail, maintaining data integrity.
-  Future<void> createNewMemberWithAccount(User newUser, Account newAccount) async {
-    final db = await instance.database;
-    await db.transaction((txn) async {
-      // Step 1: Insert the new user.
-      final newUserId = await txn.insert('users', newUser.toMap());
-
-      // Step 2: Create the account for this new user.
-      // We use the ID returned from the first insert as the owner_user_id.
-      final accountWithOwner = newAccount.copyWith(ownerUserId: newUserId);
-
-      await txn.insert('accounts', accountWithOwner.toMap());
-    });
+  /// Initializes a brand new database, creating the admin user, temple account,
+  /// and setting the temple name, all within a single atomic transaction.
+  /// This is called only during the very first registration.
+  Future<void> initializeNewDatabaseWithAdmin({
+    required User adminUser,
+    required String templeName,
+  }) async {
+    // This method now only triggers the database initialization.
+    // The actual creation logic is inside `_onCreate` which is called by `_initDB`.
+    _initialAdminUser = adminUser;
+    _initialTempleName = templeName;
+    // Close any existing connection and nullify the instance.
+    await instance.close();
+    // By calling the getter, it will re-initialize the database using _initDB
+    // which will then use the static variables we just set.
+    await instance.database;
   }
 
   /// Adds multiple transactions in a single atomic batch operation.
   /// This is much more efficient than adding them one by one.
-  Future<void> addMultipleTransactionsInBatch(List<Transaction> transactions) async {
+  Future<void> addMultipleTransactionsInBatch(
+      List<Transaction> transactions) async {
     final db = await instance.database; // สมมติว่าคุณมี getter 'database'
     await db.transaction((txn) async {
       final batch = txn.batch();
@@ -194,9 +243,22 @@ class DatabaseHelper {
 
   // --- CRUD Methods for 'users' table ---
 
-  /// Inserts a new user into the database.
+  /// Inserts a new user. If this is the first user (Admin during registration),
+  /// it ensures the database is fully created first.
   Future<int> addUser(User user) async {
     final db = await instance.database;
+
+    // Check if this is the very first user being added.
+    // The `users` table is one of the first to be created.
+    final tables = await db.rawQuery(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='users'");
+    if (tables.isEmpty) {
+      // This should not happen if _onCreate was called, but as a safeguard,
+      // we can manually trigger the creation logic if needed.
+      // However, the main fix is ensuring _initDB is awaited properly.
+      // The primary purpose of this check is to understand the state.
+    }
+
     return await db.insert('users', user.toMap(),
         conflictAlgorithm: ConflictAlgorithm.replace);
   }
@@ -214,7 +276,8 @@ class DatabaseHelper {
   /// Retrieves a user by their custom user_id_1. Useful for login.
   Future<User?> getUserByUserId1(String userId1) async {
     final db = await instance.database;
-    final maps = await db.query('users', where: 'user_id_1 = ?', whereArgs: [userId1]);
+    final maps =
+        await db.query('users', where: 'user_id_1 = ?', whereArgs: [userId1]);
     if (maps.isNotEmpty) {
       return User.fromMap(maps.first);
     }
@@ -253,7 +316,8 @@ class DatabaseHelper {
   /// Updates an existing user.
   Future<int> updateUser(User user) async {
     final db = await instance.database;
-    return await db.update('users', user.toMap(), where: 'id = ?', whereArgs: [user.id]);
+    return await db
+        .update('users', user.toMap(), where: 'id = ?', whereArgs: [user.id]);
   }
 
   /// Deletes a user by their primary key ID.
@@ -272,15 +336,15 @@ class DatabaseHelper {
   /// Updates only the role of a specific user.
   Future<int> updateUserRole(int id, String newRole) async {
     final db = await instance.database;
-    return await db
-        .update('users', {'role': newRole}, where: 'id = ?', whereArgs: [id]);
+    return await db.update('users', {'role': newRole},
+        where: 'id = ?', whereArgs: [id]);
   }
 
   /// Updates only the name of a specific user.
   Future<int> updateUserName(int id, String newName) async {
     final db = await instance.database;
-    return await db
-        .update('users', {'name': newName}, where: 'id = ?', whereArgs: [id]);
+    return await db.update('users', {'name': newName},
+        where: 'id = ?', whereArgs: [id]);
   }
 
   /// Updates only the user_id_2 of a specific user.
@@ -306,7 +370,8 @@ class DatabaseHelper {
   /// Retrieves all transactions, ordered by date descending.
   Future<List<Transaction>> getAllTransactions() async {
     final db = await instance.database;
-    final maps = await db.query('transactions', orderBy: 'transaction_date DESC');
+    final maps =
+        await db.query('transactions', orderBy: 'transaction_date DESC');
     return List.generate(maps.length, (i) {
       return Transaction.fromMap(maps[i]);
     });
@@ -337,7 +402,11 @@ class DatabaseHelper {
     // Only try to close if the database instance exists and is open.
     if (_database != null && _database!.isOpen) {
       await _database!.close();
-      _database = null; // Set to null so it can be re-initialized on next access.
+      _database =
+          null; // Set to null so it can be re-initialized on next access.
     }
   }
 }
+
+/// Provider for the DatabaseHelper instance.
+final databaseHelperProvider = Provider((ref) => DatabaseHelper.instance);

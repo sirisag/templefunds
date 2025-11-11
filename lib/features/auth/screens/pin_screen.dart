@@ -1,6 +1,12 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:templefunds/core/models/user_model.dart';
+import 'package:templefunds/features/home/screens/admin_home_screen.dart';
+import 'package:templefunds/features/home/screens/master_home_screen.dart';
+import 'package:templefunds/features/home/screens/member_home_screen.dart';
+import 'package:templefunds/features/settings/providers/settings_provider.dart';
 import '../providers/auth_provider.dart';
 import '../widgets/login_error_dialog.dart';
 
@@ -60,6 +66,27 @@ class _PinScreenState extends ConsumerState<PinScreen> {
       setState(() {
         _isLoading = false;
       });
+
+      // After setting the PIN, the state becomes `loggedIn`.
+      // Instead of relying on the AuthWrapper, we explicitly navigate to the correct home screen
+      // to avoid race conditions and navigation stack issues.
+      final newAuthState = ref.read(authProvider);
+      if (newAuthState.status == AuthStatus.loggedIn) {
+        final user = newAuthState.user;
+        Widget homeScreen;
+        if (user?.role == UserRole.Admin) {
+          homeScreen = const AdminHomeScreen();
+        } else if (user?.role == UserRole.Master) {
+          homeScreen = const MasterHomeScreen();
+        } else {
+          homeScreen = const MemberHomeScreen();
+        }
+        // Replace the entire navigation stack up to this point with the new home screen.
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => homeScreen),
+          (route) => false, // This predicate removes all previous routes
+        );
+      }
     }
   }
 
@@ -68,6 +95,7 @@ class _PinScreenState extends ConsumerState<PinScreen> {
     final authState = ref.watch(authProvider);
     final isSetupMode = authState.status == AuthStatus.requiresPinSetup;
     final canPop = Navigator.of(context).canPop();
+    final homeStyleAsync = ref.watch(homeStyleProvider);
 
     ref.listen<AuthState>(authProvider, (previous, next) {
       if (next.errorMessage != null) {
@@ -91,7 +119,10 @@ class _PinScreenState extends ConsumerState<PinScreen> {
         actions: [
           if (!isSetupMode)
             TextButton.icon(
-              onPressed: () => ref.read(authProvider.notifier).logout(),
+              onPressed: () async {
+                // เปลี่ยนจากการ logout ทันที เป็นการกลับไปหน้า Welcome
+                await ref.read(authProvider.notifier).goBackToWelcomeScreen();
+              },
               icon: const Icon(Icons.logout),
               label: const Text('ออกจากระบบ'),
               style: TextButton.styleFrom(
@@ -111,24 +142,44 @@ class _PinScreenState extends ConsumerState<PinScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  //   const SizedBox(height: 8),
-                  Padding(
-                    // This creates a 25% margin on the left and right,
-                    // making the image take up 50% of the screen width and centering it.
-                    padding: EdgeInsets.fromLTRB(
-                      MediaQuery.of(context).size.width * 0.15, // Left margin
-                      8, // Top spacing
-                      MediaQuery.of(context).size.width * 0.15, // Right margin
-                      16, // Bottom spacing
-                    ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(
-                        100.0,
-                      ), // Creates rounded corners
-                      child: Image.asset('assets/icon/icon.png'),
-                    ),
-                  ),
+                  homeStyleAsync.when(
+                    data: (style) {
+                      ImageProvider imageProvider;
+                      if (style.imagePath != null &&
+                          File(style.imagePath!).existsSync()) {
+                        imageProvider = FileImage(File(style.imagePath!));
+                      } else {
+                        imageProvider =
+                            const AssetImage('assets/icon/icon.png');
+                      }
 
+                      final horizontalPadding = (1 - style.widthMultiplier) / 2;
+
+                      return Padding(
+                        padding: EdgeInsets.symmetric(
+                            horizontal: MediaQuery.of(context).size.width *
+                                horizontalPadding),
+                        child: ClipRRect(
+                          borderRadius:
+                              BorderRadius.circular(style.cornerRadius),
+                          child: Container(
+                            width: MediaQuery.of(context).size.width *
+                                style.widthMultiplier,
+                            height: MediaQuery.of(context).size.width *
+                                style.heightMultiplier,
+                            decoration: BoxDecoration(
+                              image: DecorationImage(
+                                  fit: BoxFit.cover, image: imageProvider),
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                    loading: () => const CircleAvatar(
+                        radius: 80, child: CircularProgressIndicator()),
+                    error: (e, st) => const CircleAvatar(
+                        radius: 80, child: Icon(Icons.error)),
+                  ),
                   const SizedBox(height: 16),
                   Text(
                     isSetupMode

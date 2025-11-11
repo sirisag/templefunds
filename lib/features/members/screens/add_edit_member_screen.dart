@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:templefunds/core/models/user_model.dart';
 import 'package:templefunds/features/transactions/providers/accounts_provider.dart';
+import 'package:templefunds/core/services/crypto_service.dart';
 import 'package:templefunds/features/members/providers/members_provider.dart';
 
 class AddEditMemberScreen extends ConsumerStatefulWidget {
@@ -126,7 +127,8 @@ class _AddEditMemberScreenState extends ConsumerState<AddEditMemberScreen> {
     if (confirmed) {
       final newUser = User(
         userId1: id1,
-        userId2: id2,
+        // Hash the ID2 before creating the user object
+        userId2: ref.read(cryptoServiceProvider).hashString(id2),
         name: name,
         role: _selectedRole,
         createdAt: DateTime.now(),

@@ -22,7 +22,11 @@ class MemberManagementScreen extends ConsumerWidget {
     }
   }
 
-  void _showChangeNameDialog(BuildContext context, WidgetRef ref, User user) async {
+  void _showChangeNameDialog(
+    BuildContext context,
+    WidgetRef ref,
+    User user,
+  ) async {
     final nameController = TextEditingController(text: user.name);
     final formKey = GlobalKey<FormState>();
 
@@ -69,43 +73,54 @@ class MemberManagementScreen extends ConsumerWidget {
     );
 
     if (newName != null && newName != user.name && context.mounted) {
-      await ref.read(membersProvider.notifier).updateUserName(user.id!, newName);
+      await ref
+          .read(membersProvider.notifier)
+          .updateUserName(user.id!, newName);
     }
   }
 
   void _showResetId2Dialog(
-      BuildContext context, WidgetRef ref, User user) async {
+    BuildContext context,
+    WidgetRef ref,
+    User user,
+  ) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('ยืนยันการรีเซ็ตรหัส'),
         content: Text(
-            'คุณต้องการรีเซ็ต ID ชุดที่ 2 ของ ${user.name} ใช่หรือไม่? การกระทำนี้จะทำให้ผู้ใช้ต้องใช้รหัสใหม่ในการเข้าสู่ระบบครั้งถัดไป'),
+          'คุณต้องการรีเซ็ต ID ชุดที่ 2 ของ ${user.name} ใช่หรือไม่? การกระทำนี้จะทำให้ผู้ใช้ต้องใช้รหัสใหม่ในการเข้าสู่ระบบครั้งถัดไป',
+        ),
         actions: [
           TextButton(
-              onPressed: () => Navigator.of(ctx).pop(false),
-              child: const Text('ยกเลิก')),
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('ยกเลิก'),
+          ),
           TextButton(
-              onPressed: () => Navigator.of(ctx).pop(true),
-              child: const Text('ยืนยัน')),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('ยืนยัน'),
+          ),
         ],
       ),
     );
 
     if (confirmed == true && context.mounted) {
-      final newId2 =
-          await ref.read(membersProvider.notifier).resetId2(user.id!);
+      final newId2 = await ref
+          .read(membersProvider.notifier)
+          .resetId2(user.id!);
       if (context.mounted) {
         showDialog(
           context: context,
           builder: (ctx) => AlertDialog(
             title: const Text('รีเซ็ตสำเร็จ'),
             content: Text(
-                'ID ชุดที่ 2 ใหม่ของ ${user.name} คือ: $newId2\nกรุณาแจ้งรหัสใหม่นี้ให้เจ้าของบัญชีทราบ'),
+              'ID ชุดที่ 2 ใหม่ของ ${user.name} คือ: $newId2\nกรุณาแจ้งรหัสใหม่นี้ให้เจ้าของบัญชีทราบ',
+            ),
             actions: [
               TextButton(
-                  onPressed: () => Navigator.of(ctx).pop(),
-                  child: const Text('ตกลง')),
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: const Text('ตกลง'),
+              ),
             ],
           ),
         );
@@ -114,7 +129,10 @@ class MemberManagementScreen extends ConsumerWidget {
   }
 
   void _showChangeRoleDialog(
-      BuildContext context, WidgetRef ref, User user) async {
+    BuildContext context,
+    WidgetRef ref,
+    User user,
+  ) async {
     UserRole selectedRole = user.role;
 
     final newRole = await showDialog<UserRole>(
@@ -132,7 +150,9 @@ class MemberManagementScreen extends ConsumerWidget {
                 ),
                 items: UserRole.values.map((role) {
                   return DropdownMenuItem(
-                      value: role, child: Text(_getRoleDisplayName(role)));
+                    value: role,
+                    child: Text(_getRoleDisplayName(role)),
+                  );
                 }).toList(),
                 onChanged: (value) {
                   if (value != null) {
@@ -177,11 +197,13 @@ class MemberManagementScreen extends ConsumerWidget {
         content: Text('คุณต้องการ$actionTextบัญชีของ ${user.name} ใช่หรือไม่?'),
         actions: [
           TextButton(
-              onPressed: () => Navigator.of(ctx).pop(false),
-              child: const Text('ยกเลิก')),
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('ยกเลิก'),
+          ),
           TextButton(
-              onPressed: () => Navigator.of(ctx).pop(true),
-              child: const Text('ยืนยัน')),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('ยืนยัน'),
+          ),
         ],
       ),
     );
@@ -199,9 +221,7 @@ class MemberManagementScreen extends ConsumerWidget {
     final loggedInUser = ref.watch(authProvider).user;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('จัดการสมาชิก'),
-      ),
+      appBar: AppBar(title: const Text('จัดการสมาชิก')),
       body: membersAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (err, stack) => Center(child: Text('เกิดข้อผิดพลาด: $err')),
@@ -235,8 +255,10 @@ class MemberManagementScreen extends ConsumerWidget {
           });
 
           return ListView.builder(
-            padding:
-                const EdgeInsets.only(top: 8, bottom: 80), // Add padding for FAB
+            padding: const EdgeInsets.only(
+              top: 8,
+              bottom: 80,
+            ), // Add padding for FAB
             itemCount: members.length,
             itemBuilder: (ctx, index) {
               final user = members[index];
@@ -268,18 +290,20 @@ class MemberManagementScreen extends ConsumerWidget {
                     );
                   },
                   leading: Icon(
-                    isCurrentUser ? Icons.account_circle : getRoleIcon(user.role),
+                    isCurrentUser
+                        ? Icons.account_circle
+                        : getRoleIcon(user.role),
                     color: isActive
                         ? Theme.of(context).colorScheme.primary
                         : Colors.grey.shade600,
                   ),
                   title: Text(
-                    isCurrentUser
-                        ? '${user.name} (คุณ)'
-                        : '${user.name} ',
+                    isCurrentUser ? '${user.name} (คุณ)' : '${user.name} ',
                     style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
-                  subtitle: Text('${_getRoleDisplayName(user.role)} : ${user.userId1}'),
+                  subtitle: Text(
+                    '${_getRoleDisplayName(user.role)} : ${user.userId1}',
+                  ),
                   trailing: PopupMenuButton<String>(
                     onSelected: (value) {
                       if (value == 'reset_id2') {
@@ -293,64 +317,67 @@ class MemberManagementScreen extends ConsumerWidget {
                       } else if (value == 'change_pin') {
                         Navigator.of(context).push(
                           MaterialPageRoute(
-                              builder: (_) => const ChangePinScreen()),
+                            builder: (_) => const ChangePinScreen(),
+                          ),
                         );
                       }
                     },
                     itemBuilder: (BuildContext context) =>
                         <PopupMenuEntry<String>>[
-                      PopupMenuItem<String>(
-                        enabled: false,
-                        child: ListTile(
-                          leading: const Icon(Icons.lock_outline),
-                          title: Text('ID2: ${user.userId2}'),
-                          dense: true,
-                        ),
-                      ),
-                      const PopupMenuDivider(),
-                      const PopupMenuItem<String>(
-                        value: 'reset_id2',
-                        child: ListTile(
-                          leading: Icon(Icons.vpn_key_outlined),
-                          title: Text('รีเซ็ต ID ชุดที่ 2'),
-                        ),
-                      ),
-                      const PopupMenuItem<String>(
-                        value: 'change_name',
-                        child: ListTile(
-                          leading: Icon(Icons.edit_outlined),
-                          title: Text('เปลี่ยนชื่อ'),
-                        ),
-                      ),
-                      if (isCurrentUser)
-                        const PopupMenuItem<String>(
-                          value: 'change_pin',
-                          child: ListTile(
-                            leading: Icon(Icons.pin_outlined),
-                            title: Text('เปลี่ยนรหัส PIN'),
-                          ),
-                        )
-                      else
-                        ...[
-                          const PopupMenuItem<String>(
-                            value: 'change_role',
-                            child: ListTile(
-                              leading:
-                                  Icon(Icons.admin_panel_settings_outlined),
-                              title: Text('เปลี่ยนบทบาท'),
+                          if (isCurrentUser) ...[
+                            const PopupMenuItem<String>(
+                              value: 'change_pin',
+                              child: ListTile(
+                                leading: Icon(Icons.pin_outlined),
+                                title: Text('เปลี่ยนรหัส PIN'),
+                              ),
                             ),
-                          ),
-                          PopupMenuItem<String>(
-                            value: 'toggle_status',
-                            child: ListTile(
-                              leading: Icon(isActive
-                                  ? Icons.toggle_off_outlined
-                                  : Icons.toggle_on_outlined),
-                              title: Text(isActive ? 'ระงับการใช้งาน' : 'เปิดใช้งาน'),
+                            const PopupMenuItem<String>(
+                              value: 'reset_id2',
+                              child: ListTile(
+                                leading: Icon(Icons.vpn_key_outlined),
+                                title: Text('รีเซ็ต ID ชุดที่ 2'),
+                              ),
                             ),
-                          ),
+                          ] else ...[
+                            const PopupMenuItem<String>(
+                              value: 'reset_id2',
+                              child: ListTile(
+                                leading: Icon(Icons.vpn_key_outlined),
+                                title: Text('รีเซ็ต ID ชุดที่ 2'),
+                              ),
+                            ),
+                            const PopupMenuItem<String>(
+                              value: 'change_name',
+                              child: ListTile(
+                                leading: Icon(Icons.edit_outlined),
+                                title: Text('เปลี่ยนชื่อ'),
+                              ),
+                            ),
+                            const PopupMenuItem<String>(
+                              value: 'change_role',
+                              child: ListTile(
+                                leading: Icon(
+                                  Icons.admin_panel_settings_outlined,
+                                ),
+                                title: Text('เปลี่ยนบทบาท'),
+                              ),
+                            ),
+                            PopupMenuItem<String>(
+                              value: 'toggle_status',
+                              child: ListTile(
+                                leading: Icon(
+                                  isActive
+                                      ? Icons.toggle_off_outlined
+                                      : Icons.toggle_on_outlined,
+                                ),
+                                title: Text(
+                                  isActive ? 'ระงับการใช้งาน' : 'เปิดใช้งาน',
+                                ),
+                              ),
+                            ),
+                          ],
                         ],
-                    ],
                   ),
                 ),
               );
