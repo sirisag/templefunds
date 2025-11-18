@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:templefunds/core/widgets/app_dialogs.dart';
+import 'package:templefunds/core/widgets/scroll_indicator_wrapper.dart';
 import 'package:templefunds/core/widgets/navigation_tile.dart';
 import 'package:templefunds/core/services/report_generation_service.dart';
 import 'package:templefunds/features/auth/providers/auth_provider.dart';
@@ -19,17 +20,9 @@ class MasterHomeScreen extends ConsumerStatefulWidget {
   ConsumerState<MasterHomeScreen> createState() => _MasterHomeScreenState();
 }
 
-class _MasterHomeScreenState extends ConsumerState<MasterHomeScreen>
-    with SingleTickerProviderStateMixin {
+class _MasterHomeScreenState extends ConsumerState<MasterHomeScreen> {
   File? _pickedImageFile;
   bool _isLoading = false;
-
-  // --- Scroll Indicator ---
-  final _scrollController = ScrollController();
-  bool _showScrollIndicator = false;
-  late AnimationController _bounceAnimationController;
-  late Animation<Offset> _bounceAnimation;
-  // ------------------------
 
   Future<void> _exportReport(
     BuildContext context,
@@ -53,57 +46,6 @@ class _MasterHomeScreenState extends ConsumerState<MasterHomeScreen>
   }
 
   @override
-  void initState() {
-    super.initState();
-    _bounceAnimationController = AnimationController(
-      duration: const Duration(milliseconds: 1200),
-      vsync: this,
-    )..repeat(reverse: true);
-
-    _bounceAnimation = Tween<Offset>(
-      begin: Offset.zero,
-      end: const Offset(0, 0.15),
-    ).animate(CurvedAnimation(
-      parent: _bounceAnimationController,
-      curve: Curves.easeInOut,
-    ));
-
-    _scrollController.addListener(_scrollListener);
-
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      await Future.delayed(const Duration(milliseconds: 100));
-      if (!_scrollController.hasClients) return;
-      if (_scrollController.position.maxScrollExtent > 0) {
-        _scrollController.jumpTo(_scrollController.position.pixels + 0.1);
-        _scrollController.jumpTo(_scrollController.position.pixels - 0.1);
-      }
-      _scrollListener();
-    });
-  }
-
-  void _scrollListener() {
-    if (!_scrollController.hasClients) return;
-    bool shouldShow = _scrollController.position.maxScrollExtent > 0 &&
-        _scrollController.position.pixels <
-            _scrollController.position.maxScrollExtent;
-
-    if (shouldShow != _showScrollIndicator) {
-      setState(() {
-        _showScrollIndicator = shouldShow;
-      });
-    }
-  }
-
-  @override
-  void dispose() {
-    // Dispose controllers to prevent memory leaks
-    _scrollController.removeListener(_scrollListener);
-    _scrollController.dispose();
-    _bounceAnimationController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     final user = ref.watch(authProvider).user;
 
@@ -118,12 +60,11 @@ class _MasterHomeScreenState extends ConsumerState<MasterHomeScreen>
           ),
         ],
       ),
-      body: Stack(
-        children: [
-          ListView(
-            controller: _scrollController,
-            padding: const EdgeInsets.fromLTRB(
-                16.0, 16.0, 16.0, 80.0), // Increased bottom padding for FAB
+      body: ScrollIndicatorWrapper(
+        builder: (context, scrollController) {
+          return ListView(
+            controller: scrollController,
+            padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 80.0),
             children: [
               const SizedBox(height: 8),
               CustomizableHomeImage(pickedImageFile: _pickedImageFile),
@@ -188,33 +129,8 @@ class _MasterHomeScreenState extends ConsumerState<MasterHomeScreen>
               ),
               const SizedBox(height: 12),
             ],
-          ),
-          Positioned(
-            bottom: 16,
-            left: 0,
-            right: 0,
-            child: AnimatedOpacity(
-              opacity: _showScrollIndicator ? 1.0 : 0.0,
-              duration: const Duration(milliseconds: 300),
-              child: IgnorePointer(
-                child: Center(
-                  child: SlideTransition(
-                    position: _bounceAnimation,
-                    child: FloatingActionButton.small(
-                      onPressed: null,
-                      backgroundColor: Colors.white,
-                      child: Icon(
-                        Icons.keyboard_arrow_down,
-                        size: 24,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
+          );
+        },
       ),
     );
   }

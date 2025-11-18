@@ -9,6 +9,7 @@ import 'package:templefunds/core/models/account_model.dart';
 import 'package:templefunds/core/models/transaction_model.dart';
 import 'package:templefunds/features/auth/providers/auth_provider.dart';
 import 'package:templefunds/features/transactions/providers/accounts_provider.dart';
+import 'package:templefunds/features/transactions/widgets/transaction_dialogs.dart';
 import 'package:templefunds/features/transactions/providers/transactions_provider.dart';
 import 'package:uuid/uuid.dart';
 
@@ -97,31 +98,19 @@ class _AddSingleTransactionScreenState
         filteredBalanceProvider(_selectedAccountId!),
       );
       if (amount > currentBalance) {
-        final continueAnyway = await showDialog<bool>(
+        final accountName = ref
+            .read(allAccountsProvider)
+            .asData
+            ?.value
+            .firstWhereOrNull((acc) => acc.id == _selectedAccountId)
+            ?.name;
+        final continueAnyway = await showOverdraftWarningDialog(
           context: context,
-          builder: (ctx) => AlertDialog(
-            title: const Text('คำเตือน: ยอดเงินไม่เพียงพอ'),
-            content: Text(
-              'ยอดเงินคงเหลือ (${NumberFormat("#,##0.00").format(currentBalance)} ฿) ไม่เพียงพอสำหรับการถอนยอดนี้ (${NumberFormat("#,##0.00").format(amount)} ฿)\n\nการทำรายการจะทำให้ยอดเงินติดลบ คุณต้องการดำเนินการต่อหรือไม่?',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(ctx).pop(false),
-                child: const Text('ยกเลิก'),
-              ),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Theme.of(context).colorScheme.error,
-                  foregroundColor: Theme.of(context).colorScheme.onError,
-                ),
-                onPressed: () => Navigator.of(ctx).pop(true),
-                child: const Text('อนุมัติยอดติดลบ'),
-              ),
-            ],
-          ),
+          amount: amount,
+          accountNames: accountName ?? 'บัญชีนี้',
         );
 
-        if (continueAnyway != true) {
+        if (!continueAnyway) {
           return; // User cancelled the overdraft
         }
       }
@@ -133,45 +122,17 @@ class _AddSingleTransactionScreenState
     final selectedAccount = accounts.firstWhereOrNull(
       (acc) => acc.id == _selectedAccountId,
     );
-    final description = _descriptionController.text.trim();
-    final typeText = _transactionType == 'income' ? 'รายรับ' : 'รายจ่าย';
 
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showTransactionConfirmationDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('ยืนยันการบันทึก'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'กรุณาตรวจสอบข้อมูลก่อนบันทึก:',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-            const Divider(),
-            Text('บัญชี: ${selectedAccount?.name ?? 'ไม่พบ'}'),
-            Text('ประเภท: '),
-            Text('จำนวนเงิน: ฿${NumberFormat("#,##0.00").format(amount)}'),
-            Text('คำอธิบาย: '),
-            Text(
-              'วันที่: ${DateFormatter.formatBE(_selectedDate.toLocal(), 'd MMM yyyy, HH:mm')}',
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('แก้ไข'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('ยืนยัน'),
-          ),
-        ],
-      ),
+      transactionType: _transactionType,
+      amount: amount,
+      description: _descriptionController.text.trim(),
+      date: _selectedDate,
+      accountNames: [selectedAccount?.name ?? 'ไม่พบ'],
     );
 
-    if (confirmed != true) return;
+    if (!confirmed) return;
 
     setState(() => _isLoading = true);
 
@@ -186,7 +147,7 @@ class _AddSingleTransactionScreenState
       accountId: _selectedAccountId!,
       type: _transactionType,
       amount: amount,
-      description: description,
+      description: _descriptionController.text.trim(),
       transactionDate: _selectedDate,
       createdByUserId: loggedInUser.id!,
       createdAt: DateTime.now(),
@@ -294,8 +255,7 @@ class _AddSingleTransactionScreenState
                       RegExp(r'^\d+\.?\d{0,2}'),
                     ),
                   ],
-                  validator: (v) =>
-                      (v == null ||
+                  validator: (v) => (v == null ||
                           v.isEmpty ||
                           double.tryParse(v) == null ||
                           double.parse(v) <= 0)

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:templefunds/features/auth/providers/auth_provider.dart';
+import 'package:templefunds/features/auth/widgets/pin_form_field.dart';
 
 class ChangePinScreen extends ConsumerStatefulWidget {
   const ChangePinScreen({super.key});
@@ -15,6 +16,10 @@ class _ChangePinScreenState extends ConsumerState<ChangePinScreen> {
   final _oldPinController = TextEditingController();
   final _newPinController = TextEditingController();
   final _confirmNewPinController = TextEditingController();
+  final _oldPinFocus = FocusNode();
+  final _newPinFocus = FocusNode();
+  final _confirmNewPinFocus = FocusNode();
+
   bool _isLoading = false;
   bool _isPinVisible = false;
 
@@ -23,6 +28,9 @@ class _ChangePinScreenState extends ConsumerState<ChangePinScreen> {
     _oldPinController.dispose();
     _newPinController.dispose();
     _confirmNewPinController.dispose();
+    _oldPinFocus.dispose();
+    _newPinFocus.dispose();
+    _confirmNewPinFocus.dispose();
     super.dispose();
   }
 
@@ -78,15 +86,24 @@ class _ChangePinScreenState extends ConsumerState<ChangePinScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _buildPinField(
+              PinFormField(
                 controller: _oldPinController,
                 labelText: 'รหัส PIN ปัจจุบัน',
+                isPinVisible: _isPinVisible,
+                focusNode: _oldPinFocus,
+                onFieldSubmitted: (_) => _newPinFocus.requestFocus(),
               ),
               const SizedBox(height: 16),
-              _buildPinField(
+              PinFormField(
                 controller: _newPinController,
                 labelText: 'รหัส PIN ใหม่',
+                isPinVisible: _isPinVisible,
+                focusNode: _newPinFocus,
+                onFieldSubmitted: (_) => _confirmNewPinFocus.requestFocus(),
                 validator: (v) {
+                  if (v == null || v.trim().length != 4) {
+                    return 'กรุณากรอกรหัส PIN 4 หลัก';
+                  }
                   if (v == _oldPinController.text) {
                     return 'รหัสใหม่ต้องไม่ซ้ำรหัสเดิม';
                   }
@@ -94,10 +111,16 @@ class _ChangePinScreenState extends ConsumerState<ChangePinScreen> {
                 },
               ),
               const SizedBox(height: 16),
-              _buildPinField(
+              PinFormField(
                 controller: _confirmNewPinController,
                 labelText: 'ยืนยันรหัส PIN ใหม่',
+                isPinVisible: _isPinVisible,
+                focusNode: _confirmNewPinFocus,
+                onFieldSubmitted: (_) => _submit(),
                 validator: (v) {
+                  if (v == null || v.trim().length != 4) {
+                    return 'กรุณากรอกรหัส PIN 4 หลัก';
+                  }
                   if (v != _newPinController.text) return 'รหัส PIN ไม่ตรงกัน';
                   return null;
                 },
@@ -113,37 +136,21 @@ class _ChangePinScreenState extends ConsumerState<ChangePinScreen> {
                         padding: const EdgeInsets.symmetric(vertical: 16),
                       ),
                     ),
+              const SizedBox(height: 16),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  onPressed: () =>
+                      setState(() => _isPinVisible = !_isPinVisible),
+                  icon: Icon(
+                      _isPinVisible ? Icons.visibility_off : Icons.visibility),
+                  label: Text(_isPinVisible ? 'ซ่อนรหัส' : 'แสดงรหัส'),
+                ),
+              ),
             ],
           ),
         ),
       ),
-    );
-  }
-
-  Widget _buildPinField({
-    required TextEditingController controller,
-    required String labelText,
-    String? Function(String?)? validator,
-  }) {
-    return TextFormField(
-      controller: controller,
-      decoration: InputDecoration(
-        labelText: labelText,
-        border: const OutlineInputBorder(),
-        counterText: '',
-        suffixIcon: IconButton(
-          icon: Icon(_isPinVisible ? Icons.visibility_off : Icons.visibility),
-          onPressed: () => setState(() => _isPinVisible = !_isPinVisible),
-        ),
-      ),
-      maxLength: 4,
-      keyboardType: TextInputType.number,
-      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-      obscureText: !_isPinVisible,
-      validator: (v) {
-        if ((v?.length ?? 0) != 4) return 'ต้องเป็นเลข 4 หลัก';
-        return validator?.call(v);
-      },
     );
   }
 }

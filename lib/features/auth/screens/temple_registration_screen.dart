@@ -8,6 +8,7 @@ import 'package:templefunds/core/models/user_model.dart';
 import 'package:templefunds/features/home/screens/admin_home_screen.dart';
 import 'package:templefunds/features/home/screens/master_home_screen.dart';
 import 'package:templefunds/features/home/screens/member_home_screen.dart';
+import '../widgets/pin_form_field.dart';
 import '../providers/auth_provider.dart';
 
 class TempleRegistrationScreen extends ConsumerStatefulWidget {
@@ -234,45 +235,36 @@ class _TempleRegistrationScreenState
                     (v == null || v.length != 4) ? 'ต้องเป็นเลข 4 หลัก' : null,
               ),
               const SizedBox(height: 16),
-              TextFormField(
+              PinFormField(
                 controller: _pinController,
-                decoration: InputDecoration(
-                  labelText: 'ตั้งรหัส PIN เริ่มต้น (4 หลัก)',
-                  prefixIcon: const Icon(Icons.pin_outlined),
-                  counterText: "",
-                  suffixIcon: IconButton(
-                    icon: Icon(_isPinVisible
-                        ? Icons.visibility_off
-                        : Icons.visibility),
-                    onPressed: () =>
-                        setState(() => _isPinVisible = !_isPinVisible),
-                  ),
-                ),
-                keyboardType: TextInputType.number,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                maxLength: 4,
-                obscureText: !_isPinVisible,
-                validator: (v) =>
-                    (v == null || v.length != 4) ? 'ต้องเป็นเลข 4 หลัก' : null,
+                labelText: 'ตั้งรหัส PIN เริ่มต้น (4 หลัก)',
+                isPinVisible: _isPinVisible,
               ),
               const SizedBox(height: 16),
-              TextFormField(
+              PinFormField(
                 controller: _confirmPinController,
-                decoration: const InputDecoration(
-                  labelText: 'ยืนยันรหัส PIN',
-                  prefixIcon: Icon(Icons.pin_outlined),
-                  counterText: "",
-                ),
-                keyboardType: TextInputType.number,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                maxLength: 4,
-                obscureText: !_isPinVisible,
+                labelText: 'ยืนยันรหัส PIN',
+                isPinVisible: _isPinVisible,
                 validator: (v) {
+                  if (v == null || v.trim().length != 4) {
+                    return 'กรุณากรอกรหัส PIN 4 หลัก';
+                  }
                   if (v != _pinController.text) {
                     return 'รหัส PIN ไม่ตรงกัน';
                   }
                   return null;
                 },
+              ),
+              const SizedBox(height: 16),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  onPressed: () =>
+                      setState(() => _isPinVisible = !_isPinVisible),
+                  icon: Icon(
+                      _isPinVisible ? Icons.visibility_off : Icons.visibility),
+                  label: Text(_isPinVisible ? 'ซ่อนรหัส' : 'แสดงรหัส'),
+                ),
               ),
               const SizedBox(height: 32),
               _isLoading

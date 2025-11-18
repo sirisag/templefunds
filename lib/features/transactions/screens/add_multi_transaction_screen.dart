@@ -13,6 +13,7 @@ import 'package:templefunds/features/auth/providers/auth_provider.dart';
 import 'package:templefunds/features/members/providers/members_provider.dart';
 import 'package:templefunds/features/transactions/providers/accounts_provider.dart';
 import 'package:templefunds/features/transactions/providers/transactions_provider.dart';
+import 'package:templefunds/features/transactions/widgets/transaction_dialogs.dart';
 import 'package:templefunds/features/transactions/utils/account_sorter.dart';
 import 'package:uuid/uuid.dart';
 
@@ -102,43 +103,21 @@ class _AddMultiTransactionScreenState
       }
 
       if (overdraftAccounts.isNotEmpty) {
-        final accountNames = overdraftAccounts
-            .map((acc) {
-              final user = userMap[acc.ownerUserId];
-              if (user != null) {
-                return '${user.name} (ID: ${user.userId1})';
-              }
-              return acc.name;
-            })
-            .join('\n • ');
+        final accountNames = overdraftAccounts.map((acc) {
+          final user = userMap[acc.ownerUserId];
+          if (user != null) {
+            return '${user.name} (ID: ${user.userId1})';
+          }
+          return acc.name;
+        }).join('\n • ');
 
-        final continueAnyway = await showDialog<bool>(
+        final continueAnyway = await showOverdraftWarningDialog(
           context: context,
-          builder: (ctx) => AlertDialog(
-            title: const Text('คำเตือน: ยอดเงินไม่เพียงพอ'),
-            content: SingleChildScrollView(
-              child: Text(
-                'การถอนเงินจำนวน ${NumberFormat("#,##0.00").format(amount)} ฿ จะทำให้บัญชีต่อไปนี้มียอดติดลบ:\n\n • $accountNames\n\nคุณต้องการดำเนินการต่อหรือไม่?',
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(ctx).pop(false),
-                child: const Text('ยกเลิก'),
-              ),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Theme.of(context).colorScheme.error,
-                  foregroundColor: Theme.of(context).colorScheme.onError,
-                ),
-                onPressed: () => Navigator.of(ctx).pop(true),
-                child: const Text('อนุมัติยอดติดลบ'),
-              ),
-            ],
-          ),
+          amount: amount,
+          accountNames: accountNames,
         );
 
-        if (continueAnyway != true) {
+        if (!continueAnyway) {
           return; // User cancelled the overdraft
         }
       }
@@ -146,8 +125,6 @@ class _AddMultiTransactionScreenState
     // --- End Overdraft Check ---
 
     // Get data for confirmation dialog
-    final description = _descriptionController.text.trim();
-    final typeText = _transactionType == 'income' ? 'รายรับ' : 'รายจ่าย';
     final dateText = DateFormatter.formatBE(
       _selectedDate.toLocal(),
       'd MMM yyyy, HH:mm',
@@ -170,57 +147,16 @@ class _AddMultiTransactionScreenState
       return acc.name; // Temple account
     }).toList();
 
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showTransactionConfirmationDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('ยืนยันการบันทึก'),
-        content: SingleChildScrollView(
-          // To handle many selected accounts
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'กรุณาตรวจสอบข้อมูลก่อนบันทึก:',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-              const Divider(),
-              Text('ประเภท: $typeText'),
-              Text(
-                'จำนวนเงิน (ต่อบัญชี): ฿${NumberFormat("#,##0.00").format(amount)}',
-              ),
-              Text('คำอธิบาย: $description'),
-              Text('วันที่: $dateText'),
-              const Divider(),
-              Text(
-                'สำหรับ ${selectedAccounts.length} บัญชี:',
-                style: const TextStyle(fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 8),
-              // Display list of selected accounts
-              ...accountNames.map(
-                (name) => Padding(
-                  padding: const EdgeInsets.only(bottom: 4.0),
-                  child: Text(' • $name'),
-                ),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('แก้ไข'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('ยืนยัน'),
-          ),
-        ],
-      ),
+      transactionType: _transactionType,
+      amount: amount,
+      description: _descriptionController.text.trim(),
+      date: _selectedDate,
+      accountNames: accountNames,
     );
 
-    if (confirmed != true) {
+    if (!confirmed) {
       return;
     }
 
@@ -240,7 +176,7 @@ class _AddMultiTransactionScreenState
           accountId: accountId,
           type: _transactionType,
           amount: amount,
-          description: description,
+          description: _descriptionController.text.trim(),
           transactionDate: _selectedDate,
           createdByUserId: loggedInUser.id!,
           createdAt: DateTime.now(),
@@ -317,7 +253,9 @@ class _AddMultiTransactionScreenState
                         children: [
                           Text(
                             'เลือกบัญชี',
-                            style: Theme.of(context).textTheme.titleMedium
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleMedium
                                 ?.copyWith(fontWeight: FontWeight.bold),
                           ),
                           const Divider(),
@@ -349,9 +287,9 @@ class _AddMultiTransactionScreenState
                                     selected: {_transactionType},
                                     onSelectionChanged: (newSelection) =>
                                         setState(
-                                          () => _transactionType =
-                                              newSelection.first,
-                                        ),
+                                      () =>
+                                          _transactionType = newSelection.first,
+                                    ),
                                   ),
                                   const SizedBox(height: 8),
                                   Row(
@@ -366,17 +304,16 @@ class _AddMultiTransactionScreenState
                                             border: OutlineInputBorder(),
                                             prefixText: '฿ ',
                                           ),
-                                          keyboardType:
-                                              const TextInputType.numberWithOptions(
-                                                decimal: true,
-                                              ),
+                                          keyboardType: const TextInputType
+                                              .numberWithOptions(
+                                            decimal: true,
+                                          ),
                                           inputFormatters: [
                                             FilteringTextInputFormatter.allow(
                                               RegExp(r'^\d+\.?\d{0,2}'),
                                             ),
                                           ],
-                                          validator: (v) =>
-                                              (v == null ||
+                                          validator: (v) => (v == null ||
                                                   v.isEmpty ||
                                                   double.tryParse(v) == null ||
                                                   double.parse(v) <= 0)
@@ -391,7 +328,6 @@ class _AddMultiTransactionScreenState
                                       ),
                                     ],
                                   ),
-
                                   const SizedBox(height: 8),
                                   Row(
                                     children: [
@@ -404,8 +340,8 @@ class _AddMultiTransactionScreenState
                                           ),
                                           validator: (v) =>
                                               (v == null || v.trim().isEmpty)
-                                              ? 'กรุณากรอกคำอธิบาย'
-                                              : null,
+                                                  ? 'กรุณากรอกคำอธิบาย'
+                                                  : null,
                                         ),
                                       ),
                                       const SizedBox(width: 7),

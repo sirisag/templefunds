@@ -8,6 +8,7 @@ import 'package:templefunds/features/home/screens/master_home_screen.dart';
 import 'package:templefunds/features/home/screens/member_home_screen.dart';
 import 'package:templefunds/features/settings/providers/settings_provider.dart';
 import '../providers/auth_provider.dart';
+import '../widgets/pin_form_field.dart';
 import '../widgets/login_error_dialog.dart';
 
 class PinScreen extends ConsumerStatefulWidget {
@@ -20,6 +21,8 @@ class PinScreen extends ConsumerStatefulWidget {
 class _PinScreenState extends ConsumerState<PinScreen> {
   final _pinController = TextEditingController();
   final _confirmPinController = TextEditingController();
+  final _pinFocusNode = FocusNode();
+  final _confirmPinFocusNode = FocusNode();
   final _formKey = GlobalKey<FormState>();
   bool _isLoading = false;
   bool _isPinVisible = false;
@@ -28,6 +31,8 @@ class _PinScreenState extends ConsumerState<PinScreen> {
   void dispose() {
     _pinController.dispose();
     _confirmPinController.dispose();
+    _pinFocusNode.dispose();
+    _confirmPinFocusNode.dispose();
     super.dispose();
   }
 
@@ -189,53 +194,27 @@ class _PinScreenState extends ConsumerState<PinScreen> {
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
                   const SizedBox(height: 32),
-                  TextFormField(
+                  PinFormField(
                     controller: _pinController,
-                    decoration: InputDecoration(
-                      labelText: 'รหัส PIN (4 หลัก)',
-                      border: const OutlineInputBorder(),
-                      counterText: "",
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          _isPinVisible
-                              ? Icons.visibility_off
-                              : Icons.visibility,
-                        ),
-                        onPressed: () {
-                          setState(() {
-                            _isPinVisible = !_isPinVisible;
-                          });
-                        },
-                      ),
-                    ),
-                    keyboardType: TextInputType.number,
-                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                    maxLength: 4,
-                    obscureText: !_isPinVisible,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(fontSize: 24, letterSpacing: 16),
-                    validator: (value) {
-                      if (value == null || value.trim().length != 4) {
-                        return 'กรุณากรอกรหัส PIN 4 หลัก';
+                    focusNode: _pinFocusNode,
+                    labelText: 'รหัส PIN (4 หลัก)',
+                    isPinVisible: _isPinVisible,
+                    onFieldSubmitted: (_) {
+                      if (isSetupMode) {
+                        _confirmPinFocusNode.requestFocus();
+                      } else {
+                        _submit(isSetupMode);
                       }
-                      return null;
                     },
                   ),
                   if (isSetupMode) ...[
                     const SizedBox(height: 16),
-                    TextFormField(
+                    PinFormField(
                       controller: _confirmPinController,
-                      decoration: const InputDecoration(
-                        labelText: 'ยืนยันรหัส PIN',
-                        border: OutlineInputBorder(),
-                        counterText: "",
-                      ),
-                      keyboardType: TextInputType.number,
-                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                      maxLength: 4,
-                      obscureText: !_isPinVisible,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(fontSize: 24, letterSpacing: 16),
+                      focusNode: _confirmPinFocusNode,
+                      labelText: 'ยืนยันรหัส PIN',
+                      isPinVisible: _isPinVisible,
+                      onFieldSubmitted: (_) => _submit(isSetupMode),
                       validator: (value) {
                         if (value != _pinController.text) {
                           return 'รหัส PIN ไม่ตรงกัน';
@@ -245,6 +224,20 @@ class _PinScreenState extends ConsumerState<PinScreen> {
                     ),
                   ],
                   const SizedBox(height: 24),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton.icon(
+                      onPressed: () {
+                        setState(() {
+                          _isPinVisible = !_isPinVisible;
+                        });
+                      },
+                      icon: Icon(_isPinVisible
+                          ? Icons.visibility_off
+                          : Icons.visibility),
+                      label: Text(_isPinVisible ? 'ซ่อนรหัส' : 'แสดงรหัส'),
+                    ),
+                  ),
                   if (_isLoading)
                     const CircularProgressIndicator()
                   else
