@@ -114,7 +114,7 @@ class AdminControlPanel extends ConsumerWidget {
               ),
               // Right: Add Transaction Button
               Expanded(
-                flex: 4,
+                flex: 5,
                 child: Align(
                   alignment: Alignment.centerRight,
                   child: ElevatedButton.icon(

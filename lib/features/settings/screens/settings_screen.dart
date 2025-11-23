@@ -1,11 +1,14 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:image_cropper/image_cropper.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:templefunds/core/widgets/scroll_indicator_wrapper.dart';
 import 'package:templefunds/features/settings/providers/settings_provider.dart';
 import 'package:templefunds/features/settings/widgets/theme_color_picker.dart';
 import 'package:templefunds/features/home/widgets/home_image_customizer.dart';
+import 'package:templefunds/features/settings/widgets/temple_avatar.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -17,10 +20,14 @@ class SettingsScreen extends ConsumerStatefulWidget {
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   final _templeNameController = TextEditingController();
   final _exportPrefixController = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
 
   File? _pickedImageFile;
+  File? _pickedLogoFile;
 
-  bool _isLoading = false;
+  bool _isTempleNameSaving = false;
+  bool _isExportPrefixSaving = false;
+  bool _isLogoSaving = false;
 
   @override
   void initState() {
@@ -44,86 +51,86 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     super.dispose();
   }
 
-  Future<void> _updateTempleName() async {
-    final newName = _templeNameController.text.trim();
-    if (newName.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('ชื่อวัดต้องไม่ว่างเปล่า')),
-      );
-      return;
-    }
+  // Generic helper to handle async settings updates
+  Future<void> _handleUpdate({
+    required Future<void> Function() updateFunction,
+    required String successMessage,
+    required void Function(bool) setLoading,
+  }) async {
+    if (!_formKey.currentState!.validate()) return;
 
-    setState(() => _isLoading = true);
+    setLoading(true);
     try {
-      await ref.read(settingsProvider.notifier).updateTempleName(newName);
+      await updateFunction();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('เปลี่ยนชื่อวัดสำเร็จ'),
+          SnackBar(
+            content: Text(successMessage),
             backgroundColor: Colors.green,
           ),
         );
         FocusScope.of(context).unfocus();
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('เกิดข้อผิดพลาด: $e'),
-            backgroundColor: Theme.of(context).colorScheme.error,
-          ),
-        );
-      }
+      _showErrorSnackbar(e.toString());
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      setLoading(false);
     }
   }
 
-  Future<void> _updateExportPrefix() async {
-    final newPrefix = _exportPrefixController.text.trim();
-    setState(() => _isLoading = true);
-    try {
-      await ref
-          .read(settingsProvider.notifier)
-          .updateExportFilePrefix(newPrefix);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('เปลี่ยนชื่อไฟล์ส่งออกสำเร็จ'),
-            backgroundColor: Colors.green,
+  Future<void> _pickLogo() async {
+    final picker = ImagePicker();
+    final pickedFile =
+        await picker.pickImage(source: ImageSource.gallery, imageQuality: 90);
+
+    if (pickedFile != null && mounted) {
+      final croppedFile = await ImageCropper.platform.cropImage(
+        sourcePath: pickedFile.path,
+        compressQuality: 80,
+        uiSettings: [
+          AndroidUiSettings(
+            toolbarTitle: 'ปรับแต่งโลโก้วัด',
+            cropStyle: CropStyle.circle,
+            initAspectRatio: CropAspectRatioPreset.square,
+            lockAspectRatio: true,
           ),
-        );
-        FocusScope.of(context).unfocus();
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('เกิดข้อผิดพลาด: $e'),
-            backgroundColor: Theme.of(context).colorScheme.error,
+          IOSUiSettings(
+            title: 'ปรับแต่งโลโก้วัด',
+            cropStyle: CropStyle.circle,
+            aspectRatioLockEnabled: true,
           ),
-        );
+        ],
+      );
+      if (croppedFile != null) {
+        setState(() {
+          _pickedLogoFile = File(croppedFile.path);
+        });
       }
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  void _showErrorSnackbar(String error) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('เกิดข้อผิดพลาด: $error'),
+        backgroundColor: Theme.of(context).colorScheme.error,
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    // Listen for provider changes to update text fields if needed
-    ref.listen<AsyncValue<String?>>(templeNameProvider, (_, next) {
-      final name = next.asData?.value;
-      if (name != null && _templeNameController.text != name) {
-        _templeNameController.text = name;
-      }
-    });
-    ref.listen<AsyncValue<String?>>(exportFilePrefixProvider, (_, next) {
-      final prefix = next.asData?.value;
-      if (prefix != null && _exportPrefixController.text != prefix) {
-        _exportPrefixController.text = prefix;
-      }
-    });
+    // Use ref.watch to get the latest data and handle loading/error states
+    final templeNameAsync = ref.watch(templeNameProvider);
+    final exportPrefixAsync = ref.watch(exportFilePrefixProvider);
+
+    // Set initial text only when data is available
+    _templeNameController.text = templeNameAsync.asData?.value ?? '';
+    _exportPrefixController.text = exportPrefixAsync.asData?.value ?? '';
+
+    final isLoading =
+        _isTempleNameSaving || _isExportPrefixSaving || _isLogoSaving;
 
     return Scaffold(
       appBar: AppBar(
@@ -131,64 +138,145 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       ),
       body: Stack(
         children: [
-          ScrollIndicatorWrapper(
-            builder: (context, scrollController) => ListView(
-              controller: scrollController,
-              padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 80.0),
-              children: [
-                CustomizableHomeImage(pickedImageFile: _pickedImageFile),
-                ImageCustomizationControls(
-                  isLoading: _isLoading,
-                  onImagePicked: (file) =>
-                      setState(() => _pickedImageFile = file),
-                  imageFile: _pickedImageFile,
-                ),
-                const SizedBox(height: 24),
-                TextFormField(
-                  controller: _templeNameController,
-                  decoration: InputDecoration(
-                    labelText: 'ชื่อวัด',
-                    border: const OutlineInputBorder(),
-                    suffixIcon: IconButton(
-                      icon: const Icon(Icons.save_outlined),
-                      onPressed: _updateTempleName,
-                      tooltip: 'บันทึกชื่อวัด',
+          Form(
+            key: _formKey,
+            child: ScrollIndicatorWrapper(
+              builder: (context, scrollController) => ListView(
+                controller: scrollController,
+                padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 80.0),
+                children: [
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        children: [
+                          const Text('ตั้งค่าโลโก้วัด',
+                              style: TextStyle(
+                                  fontSize: 16, fontWeight: FontWeight.bold)),
+                          const SizedBox(height: 16),
+                          GestureDetector(
+                            onTap: _pickLogo,
+                            child: _pickedLogoFile != null
+                                ? CircleAvatar(
+                                    radius: 60,
+                                    backgroundImage:
+                                        FileImage(_pickedLogoFile!))
+                                : const TempleAvatar(radius: 60),
+                          ),
+                          const SizedBox(height: 16),
+                          ElevatedButton.icon(
+                            onPressed: _pickedLogoFile == null
+                                ? null
+                                : () => _handleUpdate(
+                                      setLoading: (v) =>
+                                          setState(() => _isLogoSaving = v),
+                                      updateFunction: () => ref
+                                          .read(settingsProvider.notifier)
+                                          .updateTempleLogo(_pickedLogoFile!),
+                                      successMessage: 'บันทึกโลโก้วัดสำเร็จ',
+                                    ),
+                            icon: const Icon(Icons.save_outlined),
+                            label: const Text('บันทึกโลโก้'),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                  onFieldSubmitted: (_) => _updateTempleName(),
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _exportPrefixController,
-                  decoration: InputDecoration(
-                    labelText: 'ชื่อไฟล์สำหรับส่งออก',
-                    helperText: 'ใช้เป็นส่วนหน้าของชื่อไฟล์ตอนสำรองข้อมูล',
-                    border: const OutlineInputBorder(),
-                    suffixIcon: IconButton(
-                      icon: const Icon(Icons.save_outlined),
-                      onPressed: _updateExportPrefix,
-                      tooltip: 'บันทึกชื่อไฟล์',
+                  const SizedBox(height: 24),
+                  CustomizableHomeImage(pickedImageFile: _pickedImageFile),
+                  ImageCustomizationControls(
+                    isLoading: isLoading,
+                    onImagePicked: (file) =>
+                        setState(() => _pickedImageFile = file),
+                    imageFile: _pickedImageFile,
+                  ),
+                  const SizedBox(height: 24),
+                  TextFormField(
+                    controller: _templeNameController,
+                    decoration: InputDecoration(
+                      labelText: 'ชื่อวัด',
+                      border: const OutlineInputBorder(),
+                      suffixIcon: _buildSaveButton(
+                        isLoading: _isTempleNameSaving,
+                        onPressed: () => _handleUpdate(
+                          setLoading: (v) =>
+                              setState(() => _isTempleNameSaving = v),
+                          updateFunction: () => ref
+                              .read(settingsProvider.notifier)
+                              .updateTempleName(
+                                  _templeNameController.text.trim()),
+                          successMessage: 'เปลี่ยนชื่อวัดสำเร็จ',
+                        ),
+                        tooltip: 'บันทึกชื่อวัด',
+                      ),
+                    ),
+                    validator: (value) =>
+                        (value == null || value.trim().isEmpty)
+                            ? 'ชื่อวัดต้องไม่ว่างเปล่า'
+                            : null,
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: _exportPrefixController,
+                    decoration: InputDecoration(
+                      labelText: 'ชื่อไฟล์สำหรับส่งออก',
+                      helperText: 'ใช้เป็นส่วนหน้าของชื่อไฟล์ตอนสำรองข้อมูล',
+                      border: const OutlineInputBorder(),
+                      suffixIcon: _buildSaveButton(
+                        isLoading: _isExportPrefixSaving,
+                        onPressed: () => _handleUpdate(
+                          setLoading: (v) =>
+                              setState(() => _isExportPrefixSaving = v),
+                          updateFunction: () => ref
+                              .read(settingsProvider.notifier)
+                              .updateExportFilePrefix(
+                                  _exportPrefixController.text.trim()),
+                          successMessage: 'เปลี่ยนชื่อไฟล์ส่งออกสำเร็จ',
+                        ),
+                        tooltip: 'บันทึกชื่อไฟล์',
+                      ),
                     ),
                   ),
-                  onFieldSubmitted: (_) => _updateExportPrefix(),
-                ),
-                const SizedBox(height: 24),
-                const Text('เลือกธีมสีของแอป',
-                    textAlign: TextAlign.center,
-                    style:
-                        TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 8),
-                const ThemeColorPicker(),
-              ],
+                  const SizedBox(height: 24),
+                  const Text('เลือกธีมสีของแอป',
+                      textAlign: TextAlign.center,
+                      style:
+                          TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  const ThemeColorPicker(),
+                ],
+              ),
             ),
           ),
-          if (_isLoading)
+          if (isLoading)
             Container(
               color: Colors.black.withOpacity(0.3),
               child: const Center(child: CircularProgressIndicator()),
             ),
         ],
       ),
+    );
+  }
+
+  Widget _buildSaveButton({
+    required bool isLoading,
+    required VoidCallback onPressed,
+    required String tooltip,
+  }) {
+    if (isLoading) {
+      return const Padding(
+        padding: EdgeInsets.all(12.0),
+        child: SizedBox(
+          width: 24,
+          height: 24,
+          child: CircularProgressIndicator(strokeWidth: 2.5),
+        ),
+      );
+    }
+    return IconButton(
+      icon: const Icon(Icons.save_outlined),
+      onPressed: onPressed,
+      tooltip: tooltip,
     );
   }
 }

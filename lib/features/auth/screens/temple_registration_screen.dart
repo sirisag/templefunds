@@ -2,6 +2,9 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:path/path.dart' as p;
+import 'package:uuid/uuid.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:image_cropper/image_cropper.dart';
 import 'package:templefunds/core/models/user_model.dart';
@@ -23,19 +26,33 @@ class _TempleRegistrationScreenState
     extends ConsumerState<TempleRegistrationScreen> {
   final _formKey = GlobalKey<FormState>();
   final _templeNameController = TextEditingController();
-  final _adminNameController = TextEditingController();
+  // New controllers for detailed admin user info
+  final _adminNicknameController = TextEditingController();
+  final _adminFirstNameController = TextEditingController();
+  final _adminLastNameController = TextEditingController();
+  final _adminOrdinationNameController = TextEditingController();
+  final _adminSpecialTitleController = TextEditingController();
+  final _adminPhoneNumberController = TextEditingController();
+  final _adminEmailController = TextEditingController();
   final _adminId1Controller = TextEditingController();
   final _pinController = TextEditingController();
   final _confirmPinController = TextEditingController();
 
   bool _isLoading = false;
   File? _logoImageFile;
+  File? _adminProfileImageFile; // New: for admin's profile image
   bool _isPinVisible = false;
 
   @override
   void dispose() {
     _templeNameController.dispose();
-    _adminNameController.dispose();
+    _adminNicknameController.dispose();
+    _adminFirstNameController.dispose();
+    _adminLastNameController.dispose();
+    _adminOrdinationNameController.dispose();
+    _adminSpecialTitleController.dispose();
+    _adminPhoneNumberController.dispose();
+    _adminEmailController.dispose();
     _adminId1Controller.dispose();
     _pinController.dispose();
     _confirmPinController.dispose();
@@ -77,6 +94,34 @@ class _TempleRegistrationScreenState
     }
   }
 
+  // New method for picking admin's profile image
+  Future<void> _pickAdminProfileImage() async {
+    final picker = ImagePicker();
+    final pickedFile =
+        await picker.pickImage(source: ImageSource.gallery, imageQuality: 90);
+
+    if (pickedFile != null && mounted) {
+      final croppedFile = await ImageCropper.platform.cropImage(
+        sourcePath: pickedFile.path,
+        compressQuality: 80,
+        uiSettings: [
+          AndroidUiSettings(
+            toolbarTitle: 'ปรับแต่งรูปภาพผู้ดูแล',
+            cropStyle: CropStyle.circle,
+            initAspectRatio: CropAspectRatioPreset.square,
+            lockAspectRatio: true,
+          ),
+          IOSUiSettings(
+              title: 'ปรับแต่งรูปภาพผู้ดูแล',
+              cropStyle: CropStyle.circle,
+              aspectRatioLockEnabled: true),
+        ],
+      );
+      if (croppedFile != null)
+        setState(() => _adminProfileImageFile = File(croppedFile.path));
+    }
+  }
+
   Future<void> _submit() async {
     if (_isLoading) return;
     if (!_formKey.currentState!.validate()) {
@@ -90,10 +135,17 @@ class _TempleRegistrationScreenState
     // (ซึ่งเราจะต้องสร้างเมธอดนี้ในขั้นตอนถัดไป)
     final newId2 = await ref.read(authProvider.notifier).registerNewTemple(
           templeName: _templeNameController.text.trim(),
-          adminName: _adminNameController.text.trim(),
+          nickname: _adminNicknameController.text.trim(),
+          firstName: _adminFirstNameController.text.trim(),
+          lastName: _adminLastNameController.text.trim(),
+          ordinationName: _adminOrdinationNameController.text.trim(),
+          specialTitle: _adminSpecialTitleController.text.trim(),
+          phoneNumber: _adminPhoneNumberController.text.trim(),
+          email: _adminEmailController.text.trim(),
           adminId1: _adminId1Controller.text.trim(),
           pin: _pinController.text.trim(),
           logoImageFile: _logoImageFile,
+          adminProfileImageFile: _adminProfileImageFile,
         );
 
     if (mounted) {
@@ -210,21 +262,80 @@ class _TempleRegistrationScreenState
                     (v == null || v.trim().isEmpty) ? 'กรุณากรอกชื่อวัด' : null,
               ),
               const SizedBox(height: 16),
-              TextFormField(
-                controller: _adminNameController,
-                decoration: const InputDecoration(
-                  labelText: 'ชื่อไวยาวัจกรณ์ (ผู้ดูแล)',
-                  prefixIcon: Icon(Icons.person_outline),
+              // Admin Profile Image Picker
+              GestureDetector(
+                onTap: _pickAdminProfileImage,
+                child: CircleAvatar(
+                  radius: 60,
+                  backgroundColor: Colors.grey.shade200,
+                  backgroundImage: _adminProfileImageFile != null
+                      ? FileImage(_adminProfileImageFile!)
+                      : null,
+                  child: _adminProfileImageFile == null
+                      ? Icon(Icons.add_a_photo_outlined,
+                          size: 40, color: Colors.grey.shade600)
+                      : null,
                 ),
+              ),
+              const SizedBox(height: 24),
+              TextFormField(
+                controller: _adminNicknameController,
+                decoration: const InputDecoration(
+                    labelText: 'ชื่อเล่น/ชื่อที่ใช้เรียก (ผู้ดูแล)*',
+                    prefixIcon: Icon(Icons.person_pin_circle_outlined)),
                 validator: (v) => (v == null || v.trim().isEmpty)
-                    ? 'กรุณากรอกชื่อผู้ดูแล'
+                    ? 'กรุณากรอกชื่อเล่นผู้ดูแล'
                     : null,
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _adminFirstNameController,
+                decoration: const InputDecoration(
+                    labelText: 'ชื่อจริง (ผู้ดูแล)',
+                    prefixIcon: Icon(Icons.person_outline)),
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _adminLastNameController,
+                decoration: const InputDecoration(
+                    labelText: 'นามสกุล (ผู้ดูแล)',
+                    prefixIcon: Icon(Icons.people_alt_outlined)),
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _adminOrdinationNameController,
+                decoration: const InputDecoration(
+                    labelText: 'ฉายา (ผู้ดูแล)',
+                    prefixIcon: Icon(Icons.book_outlined)),
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _adminSpecialTitleController,
+                decoration: const InputDecoration(
+                    labelText: 'ยศ/สมณศักดิ์ (ผู้ดูแล)',
+                    prefixIcon: Icon(Icons.star_border_outlined)),
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _adminPhoneNumberController,
+                decoration: const InputDecoration(
+                    labelText: 'เบอร์โทรศัพท์ (ผู้ดูแล)',
+                    prefixIcon: Icon(Icons.phone_outlined)),
+                keyboardType: TextInputType.phone,
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _adminEmailController,
+                decoration: const InputDecoration(
+                    labelText: 'อีเมล (ผู้ดูแล)',
+                    prefixIcon: Icon(Icons.email_outlined)),
+                keyboardType: TextInputType.emailAddress,
               ),
               const SizedBox(height: 16),
               TextFormField(
                 controller: _adminId1Controller,
                 decoration: const InputDecoration(
-                  labelText: 'ID ประจำตัวผู้ดูแล (4 หลัก)',
+                  labelText: 'ID ประจำตัวผู้ดูแล (4 หลัก)*',
                   prefixIcon: Icon(Icons.badge_outlined),
                   counterText: "",
                 ),
@@ -233,17 +344,18 @@ class _TempleRegistrationScreenState
                 maxLength: 4,
                 validator: (v) =>
                     (v == null || v.length != 4) ? 'ต้องเป็นเลข 4 หลัก' : null,
+                autovalidateMode: AutovalidateMode.onUserInteraction,
               ),
               const SizedBox(height: 16),
               PinFormField(
                 controller: _pinController,
-                labelText: 'ตั้งรหัส PIN เริ่มต้น (4 หลัก)',
+                labelText: 'ตั้งรหัส PIN เริ่มต้น (4 หลัก)*',
                 isPinVisible: _isPinVisible,
               ),
               const SizedBox(height: 16),
               PinFormField(
                 controller: _confirmPinController,
-                labelText: 'ยืนยันรหัส PIN',
+                labelText: 'ยืนยันรหัส PIN*',
                 isPinVisible: _isPinVisible,
                 validator: (v) {
                   if (v == null || v.trim().length != 4) {

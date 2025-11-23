@@ -1,9 +1,14 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:collection/collection.dart';
 import 'package:flutter_rounded_date_picker/flutter_rounded_date_picker.dart';
+import 'package:image_cropper/image_cropper.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 import 'package:templefunds/core/models/account_model.dart';
 import 'package:templefunds/core/utils/date_formatter.dart';
 import 'package:templefunds/core/models/transaction_model.dart';
@@ -30,17 +35,49 @@ class _AddMultiTransactionScreenState
   final _formKey = GlobalKey<FormState>();
   final _amountController = TextEditingController();
   final _descriptionController = TextEditingController();
+  final _remarkController = TextEditingController();
 
   final Set<int> _selectedAccountIds = {};
   String _transactionType = 'income'; // Default to income for this use case
   DateTime _selectedDate = DateTime.now();
   bool _isLoading = false;
+  File? _receiptImageFile;
 
   @override
   void dispose() {
     _amountController.dispose();
     _descriptionController.dispose();
+    _remarkController.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickImage() async {
+    final picker = ImagePicker();
+    final pickedFile =
+        await picker.pickImage(source: ImageSource.gallery, imageQuality: 80);
+
+    if (pickedFile != null && mounted) {
+      final croppedFile = await ImageCropper.platform.cropImage(
+        sourcePath: pickedFile.path,
+        compressQuality: 70,
+        uiSettings: [
+          AndroidUiSettings(
+            toolbarTitle: 'ปรับแต่งรูปภาพ',
+            initAspectRatio: CropAspectRatioPreset.original,
+            lockAspectRatio: false,
+          ),
+          IOSUiSettings(
+            title: 'ปรับแต่งรูปภาพ',
+            aspectRatioLockEnabled: false,
+          ),
+        ],
+      );
+      if (croppedFile != null) {
+        setState(() {
+          _receiptImageFile = File(croppedFile.path);
+        });
+      }
+    }
   }
 
   Future<void> _pickDate() async {
@@ -106,8 +143,9 @@ class _AddMultiTransactionScreenState
         final accountNames = overdraftAccounts.map((acc) {
           final user = userMap[acc.ownerUserId];
           if (user != null) {
-            return '${user.name} (ID: ${user.userId1})';
-          }
+            // This dialog is for changing nickname, should be replaced with a proper edit screen later
+            return '${user.nickname} (ID: ${user.userId1})';
+          } // This dialog is for changing nickname, should be replaced with a proper edit screen later
           return acc.name;
         }).join('\n • ');
 
@@ -142,8 +180,9 @@ class _AddMultiTransactionScreenState
     final accountNames = selectedAccounts.map((acc) {
       final user = userMap[acc.ownerUserId];
       if (user != null) {
-        return '${user.name} (ID: ${user.userId1})';
-      }
+        // This dialog is for changing nickname, should be replaced with a proper edit screen later
+        return '${user.nickname} (ID: ${user.userId1})';
+      } // This dialog is for changing nickname, should be replaced with a proper edit screen later
       return acc.name; // Temple account
     }).toList();
 
@@ -152,6 +191,7 @@ class _AddMultiTransactionScreenState
       transactionType: _transactionType,
       amount: amount,
       description: _descriptionController.text.trim(),
+      remark: _remarkController.text.trim(),
       date: _selectedDate,
       accountNames: accountNames,
     );
@@ -168,6 +208,15 @@ class _AddMultiTransactionScreenState
       return;
     }
 
+    String? receiptImagePath;
+    if (_receiptImageFile != null) {
+      final appDocsDir = await getApplicationDocumentsDirectory();
+      final fileExtension = p.extension(_receiptImageFile!.path);
+      final newFileName = '${const Uuid().v4()}$fileExtension';
+      receiptImagePath = p.join(appDocsDir.path, newFileName);
+      await _receiptImageFile!.copy(receiptImagePath);
+    }
+
     List<Transaction> transactionsToCreate = [];
     for (final accountId in _selectedAccountIds) {
       transactionsToCreate.add(
@@ -177,9 +226,11 @@ class _AddMultiTransactionScreenState
           type: _transactionType,
           amount: amount,
           description: _descriptionController.text.trim(),
+          remark: _remarkController.text.trim(),
+          receiptImage: receiptImagePath,
           transactionDate: _selectedDate,
           createdByUserId: loggedInUser.id!,
-          createdAt: DateTime.now(),
+          createdAt: DateTime.now(), // This was also already here.
         ),
       );
     }
@@ -337,6 +388,8 @@ class _AddMultiTransactionScreenState
                                           decoration: const InputDecoration(
                                             labelText: 'คำอธิบาย',
                                             border: OutlineInputBorder(),
+                                            prefixIcon: Icon(
+                                                Icons.description_outlined),
                                           ),
                                           validator: (v) =>
                                               (v == null || v.trim().isEmpty)
@@ -344,6 +397,30 @@ class _AddMultiTransactionScreenState
                                                   : null,
                                         ),
                                       ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Expanded(
+                                        child: TextFormField(
+                                          controller: _remarkController,
+                                          decoration: const InputDecoration(
+                                            labelText: 'หมายเหตุ (ไม่บังคับ)',
+                                            border: OutlineInputBorder(),
+                                            prefixIcon:
+                                                Icon(Icons.note_alt_outlined),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Row(
+                                    children: [
+                                      _buildReceiptPicker(),
                                       const SizedBox(width: 7),
                                       Expanded(
                                         flex: 1,
@@ -372,6 +449,42 @@ class _AddMultiTransactionScreenState
             },
           );
         },
+      ),
+    );
+  }
+
+  Widget _buildReceiptPicker() {
+    return Expanded(
+      flex: 1,
+      child: InkWell(
+        onTap: _pickImage,
+        borderRadius: BorderRadius.circular(8),
+        child: InputDecorator(
+          decoration: const InputDecoration(
+            labelText: 'ใบเสร็จ (ไม่บังคับ)',
+            border: OutlineInputBorder(),
+            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          ),
+          child: _receiptImageFile == null
+              ? const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.add_a_photo_outlined),
+                    SizedBox(width: 8),
+                    Text('เลือกรูป'),
+                  ],
+                )
+              : ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: Image.file(
+                    _receiptImageFile!,
+                    height: 40,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) =>
+                        const Icon(Icons.error),
+                  ),
+                ),
+        ),
       ),
     );
   }
@@ -417,7 +530,7 @@ class _AddMultiTransactionScreenState
                   String namePart;
                   String idPart = '';
                   if (user != null) {
-                    namePart = user.name;
+                    namePart = user.nickname;
                     idPart = ' (ID: ${user.userId1})';
                   } else {
                     namePart = account.name; // For temple account

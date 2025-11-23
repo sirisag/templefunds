@@ -93,6 +93,12 @@ class AuthNotifier extends StateNotifier<AuthState> {
         );
         final user = await _dbHelper.getUserById(lastUserId);
         if (user != null) {
+          // Check if the user is active before allowing PIN login
+          if (user.status != 'active') {
+            debugPrint("[Auth] User ${user.id} is inactive. Forcing logout.");
+            await logout(); // Force logout for inactive user
+            return;
+          }
           // User is recognized, go straight to the PIN screen
           debugPrint("[Auth] User found. Setting state to requiresPin.");
           state = state.copyWith(
@@ -231,6 +237,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
         throw Exception('รหัสยืนยันตัวตนไม่ถูกต้อง');
       }
 
+      // Check if the user is active
+      if (user.status != 'active') {
+        throw Exception('บัญชีผู้ใช้นี้ถูกระงับการใช้งาน');
+      }
+
       // Credentials are correct
       await _secureStorage.resetLoginFailureCount();
       state = state.copyWith(
@@ -249,10 +260,17 @@ class AuthNotifier extends StateNotifier<AuthState> {
   /// New method for the temple registration screen.
   Future<String?> registerNewTemple({
     required String templeName,
-    required String adminName,
+    required String nickname,
+    String? firstName,
+    String? lastName,
+    String? ordinationName,
+    String? specialTitle,
+    String? phoneNumber,
+    String? email,
     required String adminId1,
     required String pin,
     File? logoImageFile,
+    File? adminProfileImageFile,
   }) async {
     try {
       // Force delete any existing database file and close any open connections.
@@ -267,7 +285,16 @@ class AuthNotifier extends StateNotifier<AuthState> {
       var adminUser = User(
         userId1: adminId1,
         userId2: hashedAdminId2,
-        name: adminName,
+        nickname: nickname, // from new parameter
+        firstName: firstName,
+        lastName: lastName,
+        ordinationName: ordinationName,
+        specialTitle: specialTitle,
+        phoneNumber: phoneNumber,
+        email: email,
+        // profileImage will be handled here
+        profileImage: null, // Placeholder for now
+
         role: UserRole.Admin,
         createdAt: DateTime.now(),
       );

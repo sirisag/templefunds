@@ -1,17 +1,17 @@
-import 'package:collection/collection.dart';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_rounded_date_picker/flutter_rounded_date_picker.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:collection/collection.dart';
 import 'package:templefunds/core/models/account_model.dart';
-import 'package:templefunds/core/models/transaction_model.dart';
 import 'package:templefunds/core/models/user_model.dart';
-import 'package:templefunds/core/services/pdf_export_service.dart';
-import 'package:templefunds/features/auth/providers/auth_provider.dart';
 import 'package:templefunds/features/members/providers/members_provider.dart';
-import 'package:templefunds/features/settings/providers/settings_provider.dart';
+import 'package:templefunds/core/services/report_generation_service.dart';
+import 'package:templefunds/features/members/widgets/user_profile_avatar.dart';
 import 'package:templefunds/features/transactions/providers/accounts_provider.dart';
 import 'package:templefunds/features/transactions/providers/transactions_provider.dart';
+import 'package:templefunds/features/transactions/providers/accounts_provider.dart';
 import 'package:templefunds/features/transactions/screens/add_single_transaction_screen.dart';
 import 'package:templefunds/core/utils/date_formatter.dart';
 import 'package:templefunds/features/transactions/screens/temple_transactions_screen.dart';
@@ -29,12 +29,19 @@ class MemberTransactionsScreen extends ConsumerStatefulWidget {
 class _MemberTransactionsScreenState
     extends ConsumerState<MemberTransactionsScreen> {
   late DateTime _selectedMonth;
+  final ScrollController _scrollController = ScrollController();
 
   @override
   void initState() {
     super.initState();
     final now = DateTime.now();
     _selectedMonth = DateTime(now.year, now.month, 1);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
   }
 
   void _previousMonth() {
@@ -74,53 +81,26 @@ class _MemberTransactionsScreenState
     return _selectedMonth.year == now.year && _selectedMonth.month == now.month;
   }
 
-  Future<void> _exportToPdf(
-    BuildContext context,
-    String templeName,
-    User memberUser,
-    User? adminUser,
-    List<Transaction> transactions,
-    double totalBalance,
-    double startingBalance,
-  ) async {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('กำลังสร้างไฟล์ PDF...')),
-    );
-
-    try {
-      final pdfService = PdfExportService();
-
-      final monthlyIncome = transactions
-          .where((t) => t.type == 'income')
-          .fold(0.0, (sum, t) => sum + t.amount);
-      final monthlyExpense = transactions
-          .where((t) => t.type == 'expense')
-          .fold(0.0, (sum, t) => sum + t.amount);
-
-      final pdfData = await pdfService.generateMemberMonthlyReport(
-        templeName: templeName,
-        memberUser: memberUser,
-        adminUser: adminUser,
-        month: _selectedMonth,
-        transactions: transactions,
-        monthlyIncome: monthlyIncome,
-        monthlyExpense: monthlyExpense,
-        totalBalance: totalBalance,
-        startingBalance: startingBalance,
+  void _showReceiptImage(BuildContext context, String imagePath) {
+    final file = File(imagePath);
+    if (!file.existsSync()) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('ไม่พบไฟล์รูปภาพ')),
       );
-
-      await Printing.layoutPdf(
-        onLayout: (format) async => pdfData,
-        name:
-            'report_${memberUser.name.replaceAll(' ', '_')}_${DateFormatter.formatBE(_selectedMonth, 'yyyy-MM')}.pdf',
-      );
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('เกิดข้อผิดพลาดในการสร้าง PDF: $e')),
-        );
-      }
+      return;
     }
+
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        child: InteractiveViewer(
+          panEnabled: true,
+          minScale: 0.5,
+          maxScale: 4,
+          child: Image.file(file),
+        ),
+      ),
+    );
   }
 
   @override
@@ -131,8 +111,8 @@ class _MemberTransactionsScreenState
     return userAsync.when(
       loading: () =>
           const Scaffold(body: Center(child: CircularProgressIndicator())),
-      error: (e, s) =>
-          Scaffold(appBar: AppBar(), body: Center(child: Text('ไม่พบข้อมูลผู้ใช้: $e'))),
+      error: (e, s) => Scaffold(
+          appBar: AppBar(), body: Center(child: Text('ไม่พบข้อมูลผู้ใช้: $e'))),
       data: (user) {
         if (user == null) {
           return Scaffold(
@@ -145,58 +125,25 @@ class _MemberTransactionsScreenState
 
         return Scaffold(
           appBar: AppBar(
-            title: Text('บัญชี: ${user.name} (id:${user.userId1})'),
+            title: Text('บัญชี: ${user.nickname} (id:${user.userId1})'),
             actions: [
               if (account != null)
                 IconButton(
                   icon: const Icon(Icons.picture_as_pdf_outlined),
                   tooltip: 'ส่งออกเป็น PDF',
-                  onPressed: () {
-                    final templeName =
-                        ref.read(templeNameProvider).asData?.value;
-                    final allTransactions =
-                        ref.read(transactionsProvider).asData?.value;
-                    final adminUser = ref.read(authProvider).user;
-
-                    if (allTransactions != null && templeName != null) {
-                      // Filter for monthly transactions
-                      final monthlyTransactions = allTransactions.where((t) {
-                        final transactionDate = t.transactionDate.toLocal();
-                        return t.accountId == account.id! &&
-                            transactionDate.year == _selectedMonth.year &&
-                            transactionDate.month == _selectedMonth.month;
-                      }).toList();
-                      monthlyTransactions.sort((a, b) =>
-                          a.transactionDate.compareTo(b.transactionDate));
-
-                      // Calculate starting balance
-                      final firstDayOfSelectedMonth =
-                          DateTime(_selectedMonth.year, _selectedMonth.month, 1);
-                      final startingBalance = allTransactions
-                          .where((t) => t.accountId == account.id! && t.transactionDate.isBefore(firstDayOfSelectedMonth))
-                          .fold(0.0, (sum, t) => sum + (t.type == 'income' ? t.amount : -t.amount));
-
-                      // Calculate ending balance
-                      final monthlyIncome = monthlyTransactions.where((t) => t.type == 'income').fold(0.0, (sum, t) => sum + t.amount);
-                      final monthlyExpense = monthlyTransactions.where((t) => t.type == 'expense').fold(0.0, (sum, t) => sum + t.amount);
-                      final endingBalance = startingBalance + monthlyIncome - monthlyExpense;
-
-                      _exportToPdf(context, templeName, user, adminUser,
-                          monthlyTransactions, endingBalance, startingBalance);
-                    } else {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                            content:
-                                Text('ไม่สามารถส่งออกได้เนื่องจากข้อมูลยังไม่พร้อม')),
-                      );
-                    }
+                  onPressed: () async {
+                    final reportService =
+                        ref.read(reportGenerationServiceProvider);
+                    await reportService.generateAndShowMemberReport(
+                        context, _selectedMonth, widget.userId);
                   },
                 ),
             ],
           ),
           body: account == null
               ? accountsAsync.when(
-                  loading: () => const Center(child: CircularProgressIndicator()),
+                  loading: () =>
+                      const Center(child: CircularProgressIndicator()),
                   error: (e, s) =>
                       const Center(child: Text('ไม่พบบัญชีสำหรับผู้ใช้นี้')),
                   data: (_) =>
@@ -209,13 +156,14 @@ class _MemberTransactionsScreenState
               : FloatingActionButton(
                   onPressed: () {
                     Navigator.of(context).push(MaterialPageRoute(
-                      builder: (_) =>
-                          AddSingleTransactionScreen(preselectedAccount: account),
+                      builder: (_) => AddSingleTransactionScreen(
+                          preselectedAccount: account),
                     ));
                   },
                   child: const Icon(Icons.add),
                 ),
-          floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+          floatingActionButtonLocation:
+              FloatingActionButtonLocation.centerDocked,
         );
       },
     );
@@ -242,10 +190,6 @@ class _MemberTransactionsScreenState
           child: Text('เกิดข้อผิดพลาดในการโหลดผู้ใช้: ${allUsersAsync.error}'));
     }
 
-
-
-
-
     final transactions = monthlyTransactionsAsync.requireValue;
     final users = allUsersAsync.requireValue;
     final userMap = {for (var u in users) u.id: u};
@@ -258,6 +202,17 @@ class _MemberTransactionsScreenState
         ),
       );
     }
+
+    // Scroll to the bottom after the frame is built
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+    });
 
     double monthlyBalance = 0;
     for (final t in transactions) {
@@ -313,6 +268,8 @@ class _MemberTransactionsScreenState
         const Divider(height: 1),
         Expanded(
           child: ListView.builder(
+            controller: _scrollController,
+            // reverse: true, // This was causing the issue
             itemCount: transactions.length,
             itemBuilder: (ctx, index) {
               final transaction = transactions[index];
@@ -321,30 +278,57 @@ class _MemberTransactionsScreenState
                   isIncome ? Colors.green.shade700 : Colors.red.shade700;
               final amountPrefix = isIncome ? '+' : '-';
               final creator = userMap[transaction.createdByUserId];
-              final creatorName = creator?.name ?? 'ไม่ระบุ';
+              final creatorName = creator?.nickname ?? 'ไม่ระบุ';
 
               return ListTile(
-                leading: CircleAvatar(
-                  backgroundColor: amountColor.withOpacity(0.1),
-                  child: Icon(
-                    isIncome ? Icons.arrow_downward : Icons.arrow_upward,
-                    color: amountColor,
+                onTap: (transaction.receiptImage?.isNotEmpty ?? false)
+                    ? () =>
+                        _showReceiptImage(context, transaction.receiptImage!)
+                    : null,
+                leading: UserProfileAvatar(userId: widget.userId, radius: 28),
+                title: RichText(
+                  text: TextSpan(
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleMedium, // Default style for the entire RichText
+                    children: [
+                      TextSpan(
+                        text: transaction.description ?? 'ไม่มีคำอธิบาย',
+                        style: const TextStyle(
+                            fontWeight:
+                                FontWeight.bold), // Bold for description
+                      ),
+                      if (transaction.remark?.isNotEmpty ?? false)
+                        TextSpan(
+                          text: ' (${transaction.remark})',
+                          style: TextStyle(
+                            color: Colors.grey.shade600,
+                            fontWeight: FontWeight.normal, // Normal for remark
+                          ),
+                        ),
+                    ],
                   ),
-                ),
-                title: Text(
-                  transaction.description ?? 'ไม่มีคำอธิบาย',
-                  style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
                 subtitle: Text(
-                  '${DateFormatter.formatBE(transaction.transactionDate.toLocal(), "d MMM yyyy (HH:mm'น.')")} \n[ ผู้บันทึก: $creatorName ]',
+                  '${DateFormatter.formatBE(transaction.transactionDate.toLocal(), "d MMM yyyy (HH:mm'น.')")} \n[บันทึกโดย]: $creatorName',
                 ),
-                trailing: Text(
-                  '$amountPrefix฿${NumberFormat("#,##0").format(transaction.amount)}',
-                  style: TextStyle(
-                    color: amountColor,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                  ),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (transaction.receiptImage?.isNotEmpty ?? false) ...[
+                      Icon(Icons.receipt_long_outlined,
+                          color: Colors.grey.shade500, size: 20),
+                      const SizedBox(width: 8),
+                    ],
+                    Text(
+                      '$amountPrefix฿${NumberFormat("#,##0").format(transaction.amount)}',
+                      style: TextStyle(
+                        color: amountColor,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
+                      ),
+                    ),
+                  ],
                 ),
               );
             },

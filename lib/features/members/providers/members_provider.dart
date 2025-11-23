@@ -34,7 +34,7 @@ class MembersNotifier extends StateNotifier<AsyncValue<List<User>>> {
       // When adding a new user (Monk/Master), we must also create a
       // corresponding personal account for them in a single transaction.
       final newAccount = Account(
-        name: 'ปัจจัยส่วนตัว ${user.name}',
+        name: 'ปัจจัยส่วนตัว ${user.nickname}',
         createdAt: DateTime.now(),
       );
       // Use separate calls now that the initial DB creation race condition is solved.
@@ -57,9 +57,21 @@ class MembersNotifier extends StateNotifier<AsyncValue<List<User>>> {
     await loadUsers(); // Refresh the list
   }
 
-  Future<void> updateUserName(int userId, String newName) async {
-    await _dbHelper.updateUserName(userId, newName);
-    await loadUsers(); // Refresh the list
+  Future<void> updateUserProfile(int userId, User user) async {
+    try {
+      await _dbHelper.updateUserProfile(userId, user);
+      // Optimistically update the state
+      state = state.whenData((users) {
+        return [
+          for (final u in users)
+            if (u.id == userId) user else u,
+        ];
+      });
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+      rethrow;
+    }
+    // No need to call loadUsers() here, as we optimistically updated the state.
   }
 
   Future<String> resetId2(int userId) async {
@@ -71,12 +83,20 @@ class MembersNotifier extends StateNotifier<AsyncValue<List<User>>> {
     return newId2;
   }
 
-  Future<bool> isUserId1Taken(String userId1) async {
-    return _dbHelper.checkIfUserId1Exists(userId1);
+  /// Checks if a userId1 is already taken, optionally excluding a specific user ID.
+  Future<bool> isUserId1Taken(String userId1, {int? excludeUserId}) async {
+    final users = state.asData?.value ?? [];
+    return users.any((user) =>
+        user.userId1 == userId1 &&
+        (excludeUserId == null || user.id != excludeUserId));
   }
 
-  Future<bool> isNameTaken(String name) async {
-    return _dbHelper.checkIfNameExists(name);
+  /// Checks if a nickname is already taken, optionally excluding a specific user ID.
+  Future<bool> isNicknameTaken(String nickname, {int? excludeUserId}) async {
+    final users = state.asData?.value ?? [];
+    return users.any((user) =>
+        user.nickname.toLowerCase() == nickname.toLowerCase() &&
+        (excludeUserId == null || user.id != excludeUserId));
   }
 }
 

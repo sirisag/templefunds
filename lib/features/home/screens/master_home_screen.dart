@@ -69,10 +69,8 @@ class _MasterHomeScreenState extends ConsumerState<MasterHomeScreen> {
               const SizedBox(height: 8),
               CustomizableHomeImage(pickedImageFile: _pickedImageFile),
               Center(
-                child: Text(
-                  '${user?.name ?? 'เจ้าอาวาส'}',
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
+                child: Text('${user?.nickname ?? 'เจ้าอาวาส'}',
+                    style: Theme.of(context).textTheme.titleLarge),
               ),
               const SizedBox(height: 20),
               // Navigation Tiles

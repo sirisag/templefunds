@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:templefunds/core/utils/date_formatter.dart';
@@ -9,19 +10,32 @@ import 'package:templefunds/core/widgets/app_dialogs.dart';
 import 'package:templefunds/core/widgets/navigation_tile.dart';
 import 'package:templefunds/features/auth/providers/auth_provider.dart';
 import 'package:templefunds/core/services/db_export_service.dart';
-import 'package:templefunds/features/members/screens/member_management_screen.dart';
 import 'package:templefunds/features/members/providers/members_provider.dart';
 import 'package:templefunds/features/settings/providers/settings_provider.dart';
 import 'package:templefunds/features/transactions/providers/accounts_provider.dart';
 import 'package:templefunds/features/transactions/providers/transactions_provider.dart';
 import 'package:templefunds/features/home/widgets/admin_control_panel.dart';
-import 'package:templefunds/features/transactions/screens/add_multi_transaction_screen.dart';
 import 'package:templefunds/features/transactions/screens/temple_transactions_screen.dart';
+import 'package:templefunds/features/settings/widgets/temple_avatar.dart';
+import 'package:templefunds/features/members/widgets/user_profile_avatar.dart';
 import 'package:templefunds/features/transactions/screens/members_transactions_screen.dart';
 import 'package:templefunds/features/settings/screens/settings_screen.dart';
 
-class AdminHomeScreen extends ConsumerWidget {
+class AdminHomeScreen extends ConsumerStatefulWidget {
   const AdminHomeScreen({super.key});
+
+  @override
+  ConsumerState<AdminHomeScreen> createState() => _AdminHomeScreenState();
+}
+
+class _AdminHomeScreenState extends ConsumerState<AdminHomeScreen> {
+  final ScrollController _scrollController = ScrollController();
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
 
   // Helper method to show an export confirmation dialog
   Future<void> _showDbExportDialog(BuildContext context, WidgetRef ref) async {
@@ -45,7 +59,6 @@ class AdminHomeScreen extends ConsumerWidget {
     );
 
     if (confirmed == true) {
-      // Show a "processing" snackbar immediately
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('กำลังประมวลผลเพื่อส่งออกไฟล์...'),
@@ -53,10 +66,8 @@ class AdminHomeScreen extends ConsumerWidget {
         ),
       );
       try {
-        // Await the export process
         final success =
             await ref.read(dbExportServiceProvider).exportDatabaseFile();
-        // Show result snackbar
         _showExportResultSnackBar(context, success);
       } catch (e) {
         if (context.mounted) {
@@ -81,8 +92,45 @@ class AdminHomeScreen extends ConsumerWidget {
     );
   }
 
+  void _showReceiptImage(BuildContext context, String imagePath) {
+    final file = File(imagePath);
+    if (!file.existsSync()) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('ไม่พบไฟล์รูปภาพ')),
+      );
+      return;
+    }
+
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        child: InteractiveViewer(
+          panEnabled: true,
+          minScale: 0.5,
+          maxScale: 4,
+          child: Image.file(file),
+        ),
+      ),
+    );
+  }
+
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
+    ref.listen<AsyncValue<List<Transaction>>>(transactionsProvider,
+        (previous, next) {
+      if (!next.isLoading && next.hasValue) {
+        Future.delayed(const Duration(milliseconds: 50), () {
+          if (_scrollController.hasClients) {
+            _scrollController.animateTo(
+              _scrollController.position.maxScrollExtent,
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeOut,
+            );
+          }
+        });
+      }
+    });
+
     final user = ref.watch(authProvider).user;
     final transactionsAsync = ref.watch(transactionsProvider);
     final accountsAsync = ref.watch(allAccountsProvider);
@@ -106,7 +154,7 @@ class AdminHomeScreen extends ConsumerWidget {
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             ),
             Text(
-              'ไวยาวัจกรณ์: ${user?.name ?? ''} (ID: ${user?.userId1 ?? ''})',
+              'ไวยาวัจกรณ์: ${user?.nickname ?? ''} (ID: ${user?.userId1 ?? ''})',
               style: TextStyle(
                   fontSize: 14,
                   color:
@@ -145,7 +193,8 @@ class AdminHomeScreen extends ConsumerWidget {
             ),
             _buildMainMenu(context),
             AdminControlPanel(
-                onExport: () => _showDbExportDialog(context, ref)),
+              onExport: () => _showDbExportDialog(context, ref),
+            ),
           ],
         ),
       ),
@@ -174,8 +223,10 @@ class AdminHomeScreen extends ConsumerWidget {
             icon: Icons.wallet_outlined,
             title: 'รายการบัญชีพระ',
             subtitle: 'ดูธุรกรรมทั้งหมดของสมาชิก',
-            onTap: () => Navigator.of(context).push(MaterialPageRoute(
-                builder: (_) => const MembersTransactionsScreen())),
+            onTap: () {
+              Navigator.of(context).push(MaterialPageRoute(
+                  builder: (_) => const MembersTransactionsScreen()));
+            },
           ),
         ],
       ),
@@ -188,7 +239,6 @@ class AdminHomeScreen extends ConsumerWidget {
     AsyncValue<List<Account>> accountsAsync,
     AsyncValue<List<User>> membersAsync,
   ) {
-    // Combine async states
     if (transactionsAsync.isLoading ||
         accountsAsync.isLoading ||
         membersAsync.isLoading) {
@@ -214,13 +264,19 @@ class AdminHomeScreen extends ConsumerWidget {
       );
     }
 
-    // Create a map for easy account lookup
     final accountMap = {for (var acc in accounts) acc.id: acc};
     final userMap = {for (var member in members) member.id: member};
-    final limitedTransactions = transactions.take(15).toList();
+
+    // Sort transactions by 'createdAt' in ascending order (oldest first)
+    transactions.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+
+    // Take the last 15 transactions (the newest ones)
+    final limitedTransactions = transactions.length > 15
+        ? transactions.sublist(transactions.length - 15)
+        : transactions;
 
     return ListView.builder(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      controller: _scrollController,
       itemCount: limitedTransactions.length,
       itemBuilder: (context, index) {
         final transaction = limitedTransactions[index];
@@ -228,59 +284,88 @@ class AdminHomeScreen extends ConsumerWidget {
         final isIncome = transaction.type == 'income';
         final amountColor =
             isIncome ? Colors.green.shade700 : Colors.red.shade700;
-        final amountPrefix = isIncome ? '+' : '-';
+        final ownerId = account?.ownerUserId;
+        final creatorId = transaction.createdByUserId;
 
         return Card(
-          margin: const EdgeInsets.symmetric(vertical: 4),
+          margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
           child: ListTile(
-            leading: CircleAvatar(
-              backgroundColor: amountColor.withOpacity(0.1),
-              child: Icon(isIncome ? Icons.arrow_downward : Icons.arrow_upward,
-                  color: amountColor, size: 20),
-            ),
-            title: Text(
-              transaction.description ?? 'ไม่มีคำอธิบาย',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontWeight: FontWeight.bold),
-            ),
-            subtitle: RichText(
+            onTap: (transaction.receiptImage?.isNotEmpty ?? false)
+                ? () => _showReceiptImage(context, transaction.receiptImage!)
+                : null,
+            leading: account?.ownerUserId != null
+                ? UserProfileAvatar(userId: account!.ownerUserId!, radius: 28)
+                : const TempleAvatar(radius: 28),
+            title: RichText(
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               text: TextSpan(
-                style: Theme.of(context).textTheme.bodySmall,
+                style: Theme.of(context)
+                    .textTheme
+                    .titleMedium
+                    ?.copyWith(fontWeight: FontWeight.bold),
                 children: [
-                  if (account != null)
-                    if (account.ownerUserId != null) ...[
-                      // Member account: "Name:ID2"
-                      TextSpan(
-                        text:
-                            userMap[account.ownerUserId]?.name ?? account.name,
-                        style: const TextStyle(
-                            fontWeight: FontWeight.bold, fontSize: 14),
+                  TextSpan(text: transaction.description ?? 'ไม่มีคำอธิบาย'),
+                  if (transaction.remark?.isNotEmpty ?? false)
+                    TextSpan(
+                      text: ' (${transaction.remark})',
+                      style: TextStyle(
+                        color: Colors.grey.shade600,
+                        fontWeight:
+                            FontWeight.normal, // Remark should not be bold
                       ),
-                      TextSpan(
-                          text:
-                              ':${userMap[account.ownerUserId]?.userId2 ?? ''}'),
-                    ] else
-                      // Temple account
-                      TextSpan(
-                        text: account.name,
-                        style: const TextStyle(
-                            fontWeight: FontWeight.bold, fontSize: 14),
-                      )
-                  else
-                    const TextSpan(text: 'ไม่พบบัญชี'),
-                  TextSpan(
-                      text:
-                          ' ${DateFormatter.formatBE(transaction.transactionDate.toLocal(), "d MMM yyyy (HH:mm'น.')")}'),
+                    ),
                 ],
               ),
             ),
-            trailing: Text(
-                '฿${NumberFormat("#,##0", "th_TH").format(transaction.amount)}',
-                style:
-                    TextStyle(color: amountColor, fontWeight: FontWeight.bold)),
+            subtitle: RichText(
+              maxLines: 2,
+              text: TextSpan(
+                style: Theme.of(context).textTheme.bodySmall,
+                children: [
+                  if (account?.ownerUserId != null) ...[
+                    TextSpan(
+                      text: userMap[account!.ownerUserId]?.nickname ??
+                          account.name,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w500, fontSize: 14),
+                    ),
+                    TextSpan(text: ' (ID: '),
+                    TextSpan(text: userMap[account.ownerUserId]?.userId1 ?? ''),
+                    const TextSpan(text: ')'),
+                  ] else if (account != null)
+                    TextSpan(
+                      text: account.name,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w500, fontSize: 14),
+                    )
+                  else
+                    const TextSpan(text: 'ไม่พบบัญชี'),
+                  TextSpan(
+                    text:
+                        '\n${DateFormatter.formatBE(transaction.transactionDate.toLocal(), "d MMM yyyy (HH:mm'น.')")}',
+                  ),
+                ],
+              ),
+            ),
+            isThreeLine:
+                true, // Allows subtitle to have more than one line and adjusts spacing
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (transaction.receiptImage?.isNotEmpty ?? false) ...[
+                  Icon(Icons.receipt_long_outlined,
+                      color: Colors.grey.shade500, size: 20),
+                  const SizedBox(width: 8),
+                ],
+                Text(
+                    '฿${NumberFormat("#,##0", "th_TH").format(transaction.amount)}',
+                    style: TextStyle(
+                        color: amountColor,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 20)),
+              ],
+            ),
           ),
         );
       },

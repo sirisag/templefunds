@@ -9,6 +9,7 @@ Future<bool> showTransactionConfirmationDialog({
   required String transactionType,
   required double amount,
   required String description,
+  required String remark,
   required DateTime date,
   required List<String> accountNames,
 }) async {
@@ -20,6 +21,7 @@ Future<bool> showTransactionConfirmationDialog({
         transactionType: transactionType,
         amount: amount,
         description: description,
+        remark: remark,
         date: date,
         accountNames: accountNames,
       ),

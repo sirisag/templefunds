@@ -60,10 +60,8 @@ class _MemberHomeScreenState extends ConsumerState<MemberHomeScreen> {
               const SizedBox(height: 8),
               CustomizableHomeImage(pickedImageFile: _pickedImageFile),
               Center(
-                child: Text(
-                  user?.name ?? 'สมาชิก',
-                  style: Theme.of(context).textTheme.headlineSmall,
-                ),
+                child: Text(user?.nickname ?? 'สมาชิก',
+                    style: Theme.of(context).textTheme.headlineSmall),
               ),
               const SizedBox(height: 24),
               NavigationTile(

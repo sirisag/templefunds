@@ -44,10 +44,11 @@ class ReportGenerationService {
     try {
       // 1. Gather all required data from providers
       final templeName = await _ref.read(templeNameProvider.future);
-      final allAccounts = await _ref.read(allAccountsProvider.future);      
+      final allAccounts = await _ref.read(allAccountsProvider.future);
       final allTransactions = _ref.read(transactionsProvider).asData?.value;
       final allMembers = _ref.read(membersProvider).asData?.value;
       final adminUser = _ref.read(authProvider).user;
+      final logoPath = await _ref.read(templeLogoProvider.future);
 
       if (templeName == null) throw Exception('ไม่พบชื่อวัด');
       if (allTransactions == null) throw Exception('ข้อมูลธุรกรรมยังไม่พร้อม');
@@ -58,24 +59,26 @@ class ReportGenerationService {
       if (templeAccount == null) throw Exception('ไม่พบบัญชีวัด');
 
       // 2. Filter and calculate data for the selected month
-      final monthlyTransactions = _getMonthlyTransactions(
-          allTransactions, templeAccount.id!, month);
+      final monthlyTransactions =
+          _getMonthlyTransactions(allTransactions, templeAccount.id!, month);
 
       // Calculate the balance at the START of the selected month.
       final firstDayOfSelectedMonth = DateTime(month.year, month.month, 1);
-      final startingBalance = _calculateBalanceUpTo(allTransactions, templeAccount.id!, firstDayOfSelectedMonth);
-      
+      final startingBalance = _calculateBalanceUpTo(
+          allTransactions, templeAccount.id!, firstDayOfSelectedMonth);
+
       final monthlyIncome = monthlyTransactions
           .where((t) => t.type == 'income')
           .fold(0.0, (sum, t) => sum + t.amount);
       final monthlyExpense = monthlyTransactions
           .where((t) => t.type == 'expense')
           .fold(0.0, (sum, t) => sum + t.amount);
-      
+
       // The ending balance is the starting balance plus the net of the month's transactions.
       final endingBalance = startingBalance + monthlyIncome - monthlyExpense;
 
-      final masterUser = allMembers.firstWhereOrNull((u) => u.role == UserRole.Master);
+      final masterUser =
+          allMembers.firstWhereOrNull((u) => u.role == UserRole.Master);
 
       // 3. Generate PDF
       final pdfService = PdfExportService();
@@ -88,8 +91,10 @@ class ReportGenerationService {
         transactions: monthlyTransactions,
         monthlyIncome: monthlyIncome,
         monthlyExpense: monthlyExpense,
-        totalBalance: endingBalance, // This is the final balance for the summary
+        totalBalance:
+            endingBalance, // This is the final balance for the summary
         startingBalance: startingBalance,
+        logoPath: logoPath,
       );
 
       // 4. Show print preview
@@ -111,10 +116,12 @@ class ReportGenerationService {
     try {
       // 1. Gather all required data
       final templeName = await _ref.read(templeNameProvider.future);
-      final allAccounts = await _ref.read(allAccountsProvider.future);      
+      final allAccounts = await _ref.read(allAccountsProvider.future);
       final allTransactions = _ref.read(transactionsProvider).asData?.value;
       final allMembers = _ref.read(membersProvider).asData?.value;
       final adminUser = _ref.read(authProvider).user;
+      final logoPath = await _ref
+          .read(templeLogoProvider.future); // <<< FIX: Added this line
 
       if (templeName == null) throw Exception('ไม่พบชื่อวัด');
       if (allTransactions == null) throw Exception('ข้อมูลธุรกรรมยังไม่พร้อม');
@@ -128,12 +135,13 @@ class ReportGenerationService {
       if (memberAccount == null) throw Exception('ไม่พบบัญชีของสมาชิก');
 
       // 2. Filter and calculate
-      final monthlyTransactions = _getMonthlyTransactions(
-          allTransactions, memberAccount.id!, month);
+      final monthlyTransactions =
+          _getMonthlyTransactions(allTransactions, memberAccount.id!, month);
 
       // Calculate the balance at the START of the selected month.
       final firstDayOfSelectedMonth = DateTime(month.year, month.month, 1);
-      final startingBalance = _calculateBalanceUpTo(allTransactions, memberAccount.id!, firstDayOfSelectedMonth);
+      final startingBalance = _calculateBalanceUpTo(
+          allTransactions, memberAccount.id!, firstDayOfSelectedMonth);
 
       final monthlyIncome = monthlyTransactions
           .where((t) => t.type == 'income')
@@ -141,7 +149,7 @@ class ReportGenerationService {
       final monthlyExpense = monthlyTransactions
           .where((t) => t.type == 'expense')
           .fold(0.0, (sum, t) => sum + t.amount);
-      
+
       // The ending balance is the starting balance plus the net of the month's transactions.
       final endingBalance = startingBalance + monthlyIncome - monthlyExpense;
 
@@ -157,13 +165,14 @@ class ReportGenerationService {
         monthlyExpense: monthlyExpense,
         totalBalance: endingBalance,
         startingBalance: startingBalance,
+        logoPath: logoPath,
       );
 
       // 4. Show print preview
       await Printing.layoutPdf(
         onLayout: (format) async => pdfData,
         name:
-            'report_${memberUser.name.replaceAll(' ', '_')}_${DateFormat('yyyy-MM', 'th').format(month)}.pdf',
+            'report_${memberUser.nickname.replaceAll(' ', '_')}_${DateFormat('yyyy-MM', 'th').format(month)}.pdf',
       );
     } catch (e) {
       _showErrorSnackbar(context, e.toString());
@@ -188,8 +197,10 @@ class ReportGenerationService {
   double _calculateBalanceUpTo(
       List<Transaction> all, int accountId, DateTime beforeDate) {
     return all
-        .where((t) => t.accountId == accountId && t.transactionDate.isBefore(beforeDate))
-        .fold(0.0, (sum, t) => sum + (t.type == 'income' ? t.amount : -t.amount));
+        .where((t) =>
+            t.accountId == accountId && t.transactionDate.isBefore(beforeDate))
+        .fold(
+            0.0, (sum, t) => sum + (t.type == 'income' ? t.amount : -t.amount));
   }
 
   void _showLoadingSnackbar(BuildContext context, String message) {
@@ -202,7 +213,8 @@ class ReportGenerationService {
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('เกิดข้อผิดพลาด: ${error.replaceFirst("Exception: ", "")}'),
+          content:
+              Text('เกิดข้อผิดพลาด: ${error.replaceFirst("Exception: ", "")}'),
           backgroundColor: Theme.of(context).colorScheme.error,
         ),
       );
@@ -211,4 +223,5 @@ class ReportGenerationService {
 }
 
 // Provider for easy access to the service
-final reportGenerationServiceProvider = Provider((ref) => ReportGenerationService(ref));
+final reportGenerationServiceProvider =
+    Provider((ref) => ReportGenerationService(ref));

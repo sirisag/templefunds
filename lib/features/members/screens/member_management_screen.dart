@@ -4,6 +4,7 @@ import 'package:templefunds/core/models/user_model.dart';
 import 'package:templefunds/features/auth/providers/auth_provider.dart';
 import 'package:templefunds/features/members/providers/members_provider.dart';
 import 'package:templefunds/features/members/screens/change_pin_screen.dart';
+import 'package:templefunds/features/members/widgets/user_profile_avatar.dart';
 import 'package:templefunds/features/transactions/screens/member_transactions_screen.dart';
 import 'package:templefunds/features/members/screens/add_edit_member_screen.dart';
 
@@ -22,63 +23,6 @@ class MemberManagementScreen extends ConsumerWidget {
     }
   }
 
-  void _showChangeNameDialog(
-    BuildContext context,
-    WidgetRef ref,
-    User user,
-  ) async {
-    final nameController = TextEditingController(text: user.name);
-    final formKey = GlobalKey<FormState>();
-
-    final newName = await showDialog<String>(
-      context: context,
-      builder: (ctx) {
-        return AlertDialog(
-          title: Text('เปลี่ยนชื่อของ ${user.name}'),
-          content: Form(
-            key: formKey,
-            child: TextFormField(
-              controller: nameController,
-              decoration: const InputDecoration(
-                labelText: 'ชื่อใหม่',
-                border: OutlineInputBorder(),
-              ),
-              validator: (value) {
-                if (value == null || value.trim().isEmpty) {
-                  return 'กรุณากรอกชื่อ';
-                }
-                if (value.trim() == user.name) {
-                  return 'ชื่อใหม่ต้องไม่ซ้ำกับชื่อเดิม';
-                }
-                return null;
-              },
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(),
-              child: const Text('ยกเลิก'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                if (formKey.currentState!.validate()) {
-                  Navigator.of(ctx).pop(nameController.text.trim());
-                }
-              },
-              child: const Text('บันทึก'),
-            ),
-          ],
-        );
-      },
-    );
-
-    if (newName != null && newName != user.name && context.mounted) {
-      await ref
-          .read(membersProvider.notifier)
-          .updateUserName(user.id!, newName);
-    }
-  }
-
   void _showResetId2Dialog(
     BuildContext context,
     WidgetRef ref,
@@ -89,8 +33,7 @@ class MemberManagementScreen extends ConsumerWidget {
       builder: (ctx) => AlertDialog(
         title: const Text('ยืนยันการรีเซ็ตรหัส'),
         content: Text(
-          'คุณต้องการรีเซ็ต ID ชุดที่ 2 ของ ${user.name} ใช่หรือไม่? การกระทำนี้จะทำให้ผู้ใช้ต้องใช้รหัสใหม่ในการเข้าสู่ระบบครั้งถัดไป',
-        ),
+            'คุณต้องการรีเซ็ต ID ชุดที่ 2 ของ ${user.nickname} ใช่หรือไม่? การกระทำนี้จะทำให้ผู้ใช้ต้องใช้รหัสใหม่ในการเข้าสู่ระบบครั้งถัดไป'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
@@ -105,17 +48,15 @@ class MemberManagementScreen extends ConsumerWidget {
     );
 
     if (confirmed == true && context.mounted) {
-      final newId2 = await ref
-          .read(membersProvider.notifier)
-          .resetId2(user.id!);
+      final newId2 =
+          await ref.read(membersProvider.notifier).resetId2(user.id!);
       if (context.mounted) {
         showDialog(
           context: context,
           builder: (ctx) => AlertDialog(
             title: const Text('รีเซ็ตสำเร็จ'),
             content: Text(
-              'ID ชุดที่ 2 ใหม่ของ ${user.name} คือ: $newId2\nกรุณาแจ้งรหัสใหม่นี้ให้เจ้าของบัญชีทราบ',
-            ),
+                'ID ชุดที่ 2 ใหม่ของ ${user.nickname} คือ: $newId2\nกรุณาแจ้งรหัสใหม่นี้ให้เจ้าของบัญชีทราบ'),
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(ctx).pop(),
@@ -141,7 +82,7 @@ class MemberManagementScreen extends ConsumerWidget {
         return StatefulBuilder(
           builder: (dialogContext, setDialogState) {
             return AlertDialog(
-              title: Text('เปลี่ยนบทบาทของ ${user.name}'),
+              title: Text('เปลี่ยนบทบาทของ ${user.nickname}'),
               content: DropdownButtonFormField<UserRole>(
                 value: selectedRole,
                 decoration: const InputDecoration(
@@ -193,9 +134,12 @@ class MemberManagementScreen extends ConsumerWidget {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
+        // This dialog is for changing nickname, should be replaced with a proper edit screen later
         title: Text('ยืนยันการ$actionText'),
-        content: Text('คุณต้องการ$actionTextบัญชีของ ${user.name} ใช่หรือไม่?'),
+        content:
+            Text('คุณต้องการ$actionTextบัญชีของ ${user.nickname} ใช่หรือไม่?'),
         actions: [
+          // This dialog is for changing nickname, should be replaced with a proper edit screen later
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
             child: const Text('ยกเลิก'),
@@ -251,7 +195,7 @@ class MemberManagementScreen extends ConsumerWidget {
               return weightA.compareTo(weightB);
             }
             // If roles are the same, sort by name
-            return a.name.compareTo(b.name);
+            return a.nickname.compareTo(b.nickname);
           });
 
           return ListView.builder(
@@ -265,21 +209,11 @@ class MemberManagementScreen extends ConsumerWidget {
               final bool isActive = user.status == 'active';
               final bool isCurrentUser = user.id == loggedInUser?.id;
 
-              IconData getRoleIcon(UserRole role) {
-                switch (role) {
-                  case UserRole.Admin:
-                    return Icons.shield_outlined;
-                  case UserRole.Master:
-                    return Icons.school_outlined;
-                  default:
-                    return Icons.person_outline;
-                }
-              }
-
               return Card(
                 color: isActive ? null : Colors.grey.shade300,
                 margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                 child: ListTile(
+                  leading: UserProfileAvatar(userId: user.id!, radius: 28),
                   onTap: () {
                     // Navigate to the member's transaction screen when tapped.
                     Navigator.of(context).push(
@@ -289,18 +223,9 @@ class MemberManagementScreen extends ConsumerWidget {
                       ),
                     );
                   },
-                  leading: Icon(
-                    isCurrentUser
-                        ? Icons.account_circle
-                        : getRoleIcon(user.role),
-                    color: isActive
-                        ? Theme.of(context).colorScheme.primary
-                        : Colors.grey.shade600,
-                  ),
                   title: Text(
-                    isCurrentUser ? '${user.name} (คุณ)' : '${user.name} ',
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
+                      isCurrentUser ? '${user.nickname} (คุณ)' : user.nickname,
+                      style: const TextStyle(fontWeight: FontWeight.bold)),
                   subtitle: Text(
                     '${_getRoleDisplayName(user.role)} : ${user.userId1}',
                   ),
@@ -308,8 +233,13 @@ class MemberManagementScreen extends ConsumerWidget {
                     onSelected: (value) {
                       if (value == 'reset_id2') {
                         _showResetId2Dialog(context, ref, user);
-                      } else if (value == 'change_name') {
-                        _showChangeNameDialog(context, ref, user);
+                      } else if (value == 'edit_profile') {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                AddEditMemberScreen(userToEdit: user),
+                          ),
+                        );
                       } else if (value == 'change_role') {
                         _showChangeRoleDialog(context, ref, user);
                       } else if (value == 'toggle_status') {
@@ -324,60 +254,58 @@ class MemberManagementScreen extends ConsumerWidget {
                     },
                     itemBuilder: (BuildContext context) =>
                         <PopupMenuEntry<String>>[
-                          if (isCurrentUser) ...[
-                            const PopupMenuItem<String>(
-                              value: 'change_pin',
-                              child: ListTile(
-                                leading: Icon(Icons.pin_outlined),
-                                title: Text('เปลี่ยนรหัส PIN'),
-                              ),
+                      const PopupMenuItem<String>(
+                        value: 'reset_id2',
+                        child: ListTile(
+                          leading: Icon(Icons.vpn_key_outlined),
+                          title: Text('รีเซ็ต ID ชุดที่ 2'),
+                        ),
+                      ),
+                      if (isCurrentUser)
+                        const PopupMenuItem<String>(
+                          value: 'edit_profile',
+                          child: ListTile(
+                            leading: Icon(Icons.edit_outlined),
+                            title: Text('แก้ไขข้อมูลส่วนตัว'),
+                          ),
+                        ),
+                      const PopupMenuItem<String>(
+                        value: 'change_pin',
+                        child: ListTile(
+                          leading: Icon(Icons.pin_outlined),
+                          title: Text('เปลี่ยนรหัส PIN'),
+                        ),
+                      ),
+                      if (!isCurrentUser) ...[
+                        PopupMenuItem<String>(
+                          value: 'edit_profile',
+                          child: ListTile(
+                            leading: Icon(Icons.edit_outlined),
+                            title: Text(
+                                'แก้ไขข้อมูลส่วนตัว'), // This dialog is for changing nickname, should be replaced with a proper edit screen later
+                          ),
+                        ),
+                        const PopupMenuItem<String>(
+                          value: 'change_role',
+                          child: ListTile(
+                            leading: Icon(
+                              Icons.admin_panel_settings_outlined,
                             ),
-                            const PopupMenuItem<String>(
-                              value: 'reset_id2',
-                              child: ListTile(
-                                leading: Icon(Icons.vpn_key_outlined),
-                                title: Text('รีเซ็ต ID ชุดที่ 2'),
-                              ),
-                            ),
-                          ] else ...[
-                            const PopupMenuItem<String>(
-                              value: 'reset_id2',
-                              child: ListTile(
-                                leading: Icon(Icons.vpn_key_outlined),
-                                title: Text('รีเซ็ต ID ชุดที่ 2'),
-                              ),
-                            ),
-                            const PopupMenuItem<String>(
-                              value: 'change_name',
-                              child: ListTile(
-                                leading: Icon(Icons.edit_outlined),
-                                title: Text('เปลี่ยนชื่อ'),
-                              ),
-                            ),
-                            const PopupMenuItem<String>(
-                              value: 'change_role',
-                              child: ListTile(
-                                leading: Icon(
-                                  Icons.admin_panel_settings_outlined,
-                                ),
-                                title: Text('เปลี่ยนบทบาท'),
-                              ),
-                            ),
-                            PopupMenuItem<String>(
-                              value: 'toggle_status',
-                              child: ListTile(
-                                leading: Icon(
-                                  isActive
-                                      ? Icons.toggle_off_outlined
-                                      : Icons.toggle_on_outlined,
-                                ),
-                                title: Text(
-                                  isActive ? 'ระงับการใช้งาน' : 'เปิดใช้งาน',
-                                ),
-                              ),
-                            ),
-                          ],
-                        ],
+                            title: Text('เปลี่ยนบทบาท'),
+                          ),
+                        ),
+                        PopupMenuItem<String>(
+                          value: 'toggle_status',
+                          child: ListTile(
+                            leading: Icon(isActive
+                                ? Icons.toggle_off_outlined
+                                : Icons.toggle_on_outlined),
+                            title: Text(
+                                isActive ? 'ระงับการใช้งาน' : 'เปิดใช้งาน'),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 ),
               );

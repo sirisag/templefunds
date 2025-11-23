@@ -46,9 +46,18 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 1,
+      version: 2, // Incremented version
       onCreate: _onCreate,
+      onUpgrade: _onUpgrade,
     );
+  }
+
+  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      await db.execute("ALTER TABLE transactions ADD COLUMN remark TEXT;");
+      await db
+          .execute("ALTER TABLE transactions ADD COLUMN receipt_image TEXT;");
+    }
   }
 
   /// Deletes the entire database file from the device.
@@ -105,7 +114,14 @@ class DatabaseHelper {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id_1 TEXT NOT NULL UNIQUE,
         user_id_2 TEXT NOT NULL,
-        name TEXT NOT NULL,
+        first_name TEXT,
+        last_name TEXT,
+        nickname TEXT NOT NULL,
+        ordination_name TEXT,
+        special_title TEXT,
+        phone_number TEXT,
+        email TEXT,
+        profile_image TEXT,
         role TEXT NOT NULL,
         created_at TEXT NOT NULL,
         status TEXT NOT NULL DEFAULT 'active'
@@ -129,6 +145,8 @@ class DatabaseHelper {
         type TEXT NOT NULL,
         amount REAL NOT NULL,
         description TEXT,
+        remark TEXT,
+        receipt_image TEXT,
         transaction_date TEXT NOT NULL,
         created_by_user_id INTEGER NOT NULL,
         created_at TEXT NOT NULL,
@@ -296,18 +314,29 @@ class DatabaseHelper {
     return result.isNotEmpty;
   }
 
-  /// Checks if a name already exists in the database.
-  Future<bool> checkIfNameExists(String name) async {
+  /// Checks if a nickname already exists in the database.
+  Future<bool> checkIfNicknameExists(String nickname) async {
     final db = await instance.database;
-    final result =
-        await db.query('users', where: 'name = ?', whereArgs: [name], limit: 1);
+    final result = await db.query(
+      'users',
+      where: 'nickname = ?',
+      whereArgs: [nickname],
+      limit: 1,
+    );
     return result.isNotEmpty;
   }
 
-  /// Retrieves all users from the database, ordered by name.
+  /// Retrieves all users from the database, ordered by nickname.
   Future<List<User>> getAllUsers() async {
     final db = await instance.database;
-    final maps = await db.query('users', orderBy: 'name ASC');
+    // Order by role first (Admin, Master, Monk), then by nickname
+    final maps = await db.query('users', orderBy: '''
+      CASE role
+        WHEN 'Admin' THEN 0
+        WHEN 'Master' THEN 1
+        ELSE 2
+      END, nickname ASC
+    ''');
     return List.generate(maps.length, (i) {
       return User.fromMap(maps[i]);
     });
@@ -340,11 +369,20 @@ class DatabaseHelper {
         where: 'id = ?', whereArgs: [id]);
   }
 
-  /// Updates only the name of a specific user.
-  Future<int> updateUserName(int id, String newName) async {
+  /// Updates the profile information of a specific user.
+  Future<int> updateUserProfile(int id, User user) async {
     final db = await instance.database;
-    return await db.update('users', {'name': newName},
-        where: 'id = ?', whereArgs: [id]);
+    // Only update the fields that are part of the user profile
+    // We exclude id, user_id_2, and created_at as they should not be changed here.
+    // user_id_1 is also excluded as per the new requirement.
+    final dataToUpdate = user.toMap();
+    dataToUpdate.remove('id');
+    dataToUpdate.remove('user_id_2');
+    dataToUpdate.remove('created_at');
+    // dataToUpdate.remove('user_id_1'); // user_id_1 is already excluded from copyWith in the screen
+
+    return await db
+        .update('users', dataToUpdate, where: 'id = ?', whereArgs: [id]);
   }
 
   /// Updates only the user_id_2 of a specific user.
@@ -370,8 +408,9 @@ class DatabaseHelper {
   /// Retrieves all transactions, ordered by date descending.
   Future<List<Transaction>> getAllTransactions() async {
     final db = await instance.database;
+    // Changed to ASC to sort from oldest to newest by default
     final maps =
-        await db.query('transactions', orderBy: 'transaction_date DESC');
+        await db.query('transactions', orderBy: 'transaction_date ASC');
     return List.generate(maps.length, (i) {
       return Transaction.fromMap(maps[i]);
     });
@@ -384,7 +423,7 @@ class DatabaseHelper {
       'transactions',
       where: 'account_id = ?',
       whereArgs: [accountId],
-      orderBy: 'transaction_date DESC',
+      orderBy: 'transaction_date ASC',
     );
     return List.generate(maps.length, (i) {
       return Transaction.fromMap(maps[i]);

@@ -188,8 +188,8 @@ class _PinScreenState extends ConsumerState<PinScreen> {
                   const SizedBox(height: 16),
                   Text(
                     isSetupMode
-                        ? 'ตั้งรหัส PIN 4 หลักสำหรับเข้าใช้งาน'
-                        : 'สวัสดี, ${authState.user?.name ?? 'ผู้ใช้งาน'}\nกรุณาใส่รหัส PIN ของคุณ',
+                        ? 'ตั้งรหัส PIN 4 หลักสำหรับเข้าใช้งาน' // This dialog is for changing nickname, should be replaced with a proper edit screen later
+                        : 'สวัสดี, ${authState.user?.nickname ?? 'ผู้ใช้งาน'}\nกรุณาใส่รหัส PIN ของคุณ',
                     textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.titleLarge,
                   ),

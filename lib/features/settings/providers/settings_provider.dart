@@ -27,6 +27,12 @@ final themeSeedColorProvider = FutureProvider<String?>((ref) async {
   return dbHelper.getAppMetadata('theme_seed_color');
 });
 
+/// A provider to fetch the saved temple logo path from the database.
+final templeLogoProvider = FutureProvider<String?>((ref) async {
+  final dbHelper = DatabaseHelper.instance;
+  return dbHelper.getAppMetadata('temple_logo_path');
+});
+
 /// Notifier for handling settings updates.
 class SettingsNotifier extends StateNotifier<AsyncValue<void>> {
   final Ref _ref;
@@ -64,6 +70,27 @@ class SettingsNotifier extends StateNotifier<AsyncValue<void>> {
     try {
       await _dbHelper.setAppMetadata('theme_seed_color', colorName);
       _ref.invalidate(themeSeedColorProvider); // Force refresh
+      state = const AsyncValue.data(null);
+    } catch (e) {
+      state = AsyncValue.error(e, StackTrace.current);
+      rethrow;
+    }
+  }
+
+  Future<void> updateTempleLogo(File logoFile) async {
+    state = const AsyncValue.loading();
+    try {
+      // Save the image to a permanent location in the app's documents directory
+      final appDocsDir = await getApplicationDocumentsDirectory();
+      final fileExtension = p.extension(logoFile.path);
+      final newFileName = 'temple_logo$fileExtension';
+      final newPath = p.join(appDocsDir.path, newFileName);
+
+      // Copy the picked file to the new path
+      await logoFile.copy(newPath);
+
+      await _dbHelper.setAppMetadata('temple_logo_path', newPath);
+      _ref.invalidate(templeLogoProvider); // Force refresh
       state = const AsyncValue.data(null);
     } catch (e) {
       state = AsyncValue.error(e, StackTrace.current);

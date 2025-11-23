@@ -7,6 +7,8 @@ class Transaction {
   final String? description;
   final DateTime transactionDate;
   final int createdByUserId;
+  final String? remark; // Optional note
+  final String? receiptImage; // Optional path to receipt image
   final DateTime createdAt;
 
   Transaction({
@@ -16,6 +18,8 @@ class Transaction {
     required this.amount,
     this.description,
     required this.transactionDate,
+    this.remark,
+    this.receiptImage,
     required this.createdByUserId,
     required this.createdAt,
   });
@@ -30,6 +34,8 @@ class Transaction {
       'amount': amount,
       'description': description,
       'transaction_date': transactionDate.toIso8601String(),
+      'remark': remark,
+      'receipt_image': receiptImage,
       'created_by_user_id': createdByUserId,
       'created_at': createdAt.toIso8601String(),
     };
@@ -44,6 +50,8 @@ class Transaction {
       // Ensure amount is read as a number (double or int)
       amount: (map['amount'] as num).toDouble(),
       description: map['description'] as String?,
+      remark: map['remark'] as String?,
+      receiptImage: map['receipt_image'] as String?,
       transactionDate: DateTime.parse(map['transaction_date'] as String),
       createdByUserId: map['created_by_user_id'] as int,
       createdAt: DateTime.parse(map['created_at'] as String),

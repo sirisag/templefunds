@@ -1,9 +1,14 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:collection/collection.dart';
 import 'package:flutter_rounded_date_picker/flutter_rounded_date_picker.dart';
+import 'package:image_cropper/image_cropper.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 import 'package:templefunds/core/utils/date_formatter.dart';
 import 'package:templefunds/core/models/account_model.dart';
 import 'package:templefunds/core/models/transaction_model.dart';
@@ -28,11 +33,13 @@ class _AddSingleTransactionScreenState
   final _formKey = GlobalKey<FormState>();
   final _amountController = TextEditingController();
   final _descriptionController = TextEditingController();
+  final _remarkController = TextEditingController();
 
   int? _selectedAccountId;
   String _transactionType = 'expense'; // 'income' or 'expense'
   DateTime _selectedDate = DateTime.now();
   bool _isLoading = false;
+  File? _receiptImageFile;
 
   @override
   void initState() {
@@ -46,7 +53,35 @@ class _AddSingleTransactionScreenState
   void dispose() {
     _amountController.dispose();
     _descriptionController.dispose();
+    _remarkController.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickImage() async {
+    final picker = ImagePicker();
+    final pickedFile =
+        await picker.pickImage(source: ImageSource.gallery, imageQuality: 80);
+
+    if (pickedFile != null && mounted) {
+      final croppedFile = await ImageCropper.platform.cropImage(
+        sourcePath: pickedFile.path,
+        compressQuality: 70,
+        uiSettings: [
+          AndroidUiSettings(
+            toolbarTitle: 'ปรับแต่งรูปภาพ',
+            initAspectRatio: CropAspectRatioPreset.original,
+            lockAspectRatio: false,
+          ),
+          IOSUiSettings(
+            title: 'ปรับแต่งรูปภาพ',
+            aspectRatioLockEnabled: false,
+          ),
+        ],
+      );
+      if (croppedFile != null) {
+        setState(() => _receiptImageFile = File(croppedFile.path));
+      }
+    }
   }
 
   Future<void> _pickDate() async {
@@ -128,6 +163,7 @@ class _AddSingleTransactionScreenState
       transactionType: _transactionType,
       amount: amount,
       description: _descriptionController.text.trim(),
+      remark: _remarkController.text.trim(),
       date: _selectedDate,
       accountNames: [selectedAccount?.name ?? 'ไม่พบ'],
     );
@@ -142,15 +178,26 @@ class _AddSingleTransactionScreenState
       return;
     }
 
+    String? receiptImagePath;
+    if (_receiptImageFile != null) {
+      final appDocsDir = await getApplicationDocumentsDirectory();
+      final fileExtension = p.extension(_receiptImageFile!.path);
+      final newFileName = '${const Uuid().v4()}$fileExtension';
+      receiptImagePath = p.join(appDocsDir.path, newFileName);
+      await _receiptImageFile!.copy(receiptImagePath);
+    }
+
     final newTransaction = Transaction(
       id: const Uuid().v4(),
       accountId: _selectedAccountId!,
       type: _transactionType,
       amount: amount,
       description: _descriptionController.text.trim(),
+      remark: _remarkController.text.trim(),
+      receiptImage: receiptImagePath,
       transactionDate: _selectedDate,
       createdByUserId: loggedInUser.id!,
-      createdAt: DateTime.now(),
+      createdAt: DateTime.now(), // This was already here, which is great!
     );
 
     try {
@@ -268,11 +315,44 @@ class _AddSingleTransactionScreenState
                   decoration: const InputDecoration(
                     labelText: 'คำอธิบาย',
                     border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.description_outlined),
                   ),
                   maxLines: 1,
                   validator: (v) => (v == null || v.trim().isEmpty)
                       ? 'กรุณากรอกคำอธิบาย'
                       : null,
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _remarkController,
+                  decoration: const InputDecoration(
+                    labelText: 'หมายเหตุ (ไม่บังคับ)',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.note_alt_outlined),
+                  ),
+                  maxLines: 1,
+                ),
+                const SizedBox(height: 16),
+                InkWell(
+                  onTap: _pickImage,
+                  borderRadius: BorderRadius.circular(8),
+                  child: InputDecorator(
+                    decoration: const InputDecoration(
+                      labelText: 'ใบเสร็จ (ไม่บังคับ)',
+                      border: OutlineInputBorder(),
+                      contentPadding:
+                          EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    ),
+                    child: _receiptImageFile == null
+                        ? const Row(
+                            children: [
+                              Icon(Icons.add_a_photo_outlined),
+                              SizedBox(width: 8),
+                              Text('เลือกรูปภาพใบเสร็จ'),
+                            ],
+                          )
+                        : Image.file(_receiptImageFile!, height: 100),
+                  ),
                 ),
                 const SizedBox(height: 16),
                 ListTile(
