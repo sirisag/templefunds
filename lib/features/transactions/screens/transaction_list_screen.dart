@@ -22,8 +22,7 @@ class TransactionListScreen extends ConsumerWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
-            onPressed: () =>
-                ref.read(transactionsProvider.notifier).loadTransactions(),
+            onPressed: () => ref.invalidate(transactionsProvider),
           ),
         ],
       ),
@@ -49,8 +48,7 @@ class TransactionListScreen extends ConsumerWidget {
               final amountPrefix = isIncome ? '+' : '-';
 
               return Card(
-                margin:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                 child: ListTile(
                   leading: CircleAvatar(
                     backgroundColor: amountColor.withOpacity(0.1),
@@ -83,8 +81,8 @@ class TransactionListScreen extends ConsumerWidget {
                             context: context,
                             builder: (ctx) => AlertDialog(
                               title: const Text('ยืนยันการลบ'),
-                              content:
-                                  const Text('คุณต้องการลบรายการนี้ใช่หรือไม่?'),
+                              content: const Text(
+                                  'คุณต้องการลบรายการนี้ใช่หรือไม่?'),
                               actions: [
                                 TextButton(
                                   onPressed: () => Navigator.of(ctx).pop(false),
@@ -101,7 +99,9 @@ class TransactionListScreen extends ConsumerWidget {
                           );
 
                           if (confirmed == true) {
-                            await ref.read(transactionsProvider.notifier).deleteTransaction(transaction.id);
+                            await ref
+                                .read(transactionsProvider.notifier)
+                                .deleteTransaction(transaction.id);
                           }
                         },
                       ),
@@ -125,8 +125,8 @@ class TransactionListScreen extends ConsumerWidget {
                   .firstWhereOrNull((acc) => acc.ownerUserId == null);
               if (templeAccount != null) {
                 Navigator.of(context).push(MaterialPageRoute(
-                  builder: (_) =>
-                      AddSingleTransactionScreen(preselectedAccount: templeAccount),
+                  builder: (_) => AddSingleTransactionScreen(
+                      preselectedAccount: templeAccount),
                 ));
               }
             },

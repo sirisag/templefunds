@@ -15,30 +15,27 @@ class UserProfileAvatar extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final userAsync = ref.watch(memberByIdProvider(userId));
+    // The provider now returns User? directly, not an AsyncValue.
+    final user = ref.watch(memberByIdProvider(userId));
 
-    return userAsync.when(
-      data: (user) {
-        ImageProvider? backgroundImage;
-        if (user?.profileImage != null &&
-            File(user!.profileImage!).existsSync()) {
-          // Use a key to force reload when the path changes
-          backgroundImage = FileImage(File(user.profileImage!));
-        }
+    // If the user is null (still loading, error, or not found), show a placeholder.
+    if (user == null) {
+      return CircleAvatar(
+          radius: radius, backgroundColor: Colors.grey.shade200);
+    }
 
-        return CircleAvatar(
-          radius: radius,
-          backgroundColor: Colors.grey.shade200,
-          backgroundImage: backgroundImage,
-          child: backgroundImage == null
-              ? Icon(Icons.person, color: Colors.grey.shade600, size: radius)
-              : null,
-        );
-      },
-      loading: () => CircleAvatar(radius: radius), // Placeholder while loading
-      error: (e, s) => CircleAvatar(
-          radius: radius,
-          child: const Icon(Icons.error_outline)), // Error state
+    ImageProvider? backgroundImage;
+    if (user.profileImage != null && File(user.profileImage!).existsSync()) {
+      backgroundImage = FileImage(File(user.profileImage!));
+    }
+
+    return CircleAvatar(
+      radius: radius,
+      backgroundColor: Colors.grey.shade200,
+      backgroundImage: backgroundImage,
+      child: backgroundImage == null
+          ? Icon(Icons.person, color: Colors.grey.shade600, size: radius)
+          : null,
     );
   }
 }

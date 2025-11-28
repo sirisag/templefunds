@@ -31,39 +31,39 @@ dependencies:
   flutter:
     sdk: flutter
 
-  shared_preferences: ^2.2.2
+  shared_preferences: ^2.5.3
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
 
   # State Management
-  flutter_riverpod: ^2.5.1 # หรือเวอร์ชันล่าสุด
+  flutter_riverpod: ^3.0.3
 
   # Database
-  sqflite: ^2.3.4
-  path: ^1.9.0
+  sqflite: ^2.4.2
+  path: ^1.9.1
 
   # Secure Storage for PIN
-  flutter_secure_storage: ^9.2.2
+  flutter_secure_storage: ^9.2.4
 
   # Hashing for PIN
-  crypto: ^3.0.3
+  crypto: ^3.0.7
 
   # Formatting, File Sharing & Picking
-  path_provider: ^2.1.3
+  path_provider: ^2.1.5
   intl: ^0.20.2
-  collection: ^1.18.0
-  share_plus: ^9.0.0
-  file_picker: ^8.0.6
-  pdf: ^3.11.3
-  printing: ^5.11.1
+  collection: ^1.19.1
+  share_plus: ^12.0.1
+  file_picker: ^10.3.7
+  pdf: ^3.11.0
+  printing: ^5.14.2
 
   # Encryption for Database file
   encrypt: ^5.0.3
 
   # For generating unique IDs
-  uuid: ^4.4.0
+  uuid: ^4.5.2
 
   # For animated floating action button menu
   flutter_speed_dial: ^7.0.0
@@ -74,24 +74,21 @@ dependencies:
     sdk: flutter
 
   # For picking images from the gallery or camera
-  image_picker: ^1.1.2
+  image_picker: ^1.2.1
   
   # For cropping and rotating images
   image_cropper: ^11.0.0
 
-dev_dependencies:
+dev_dependencies: 
   flutter_test:
     sdk: flutter
 
   # The "flutter_lints" package below contains a set of recommended lints to
   # encourage good coding practices. The lint set is activated in the
   # `analysis_options.yaml` file located at the root of your package.
-  flutter_lints: ^4.0.0
+  flutter_lints: ^6.0.0
 
-  flutter_launcher_icons: ^0.13.1
-
-dependency_overrides:
-  js: ^0.7.1
+  flutter_launcher_icons: ^0.14.4
 
 
 # For information on the generic Dart part of this file, see the

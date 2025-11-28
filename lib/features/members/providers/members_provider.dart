@@ -6,24 +6,18 @@ import 'package:templefunds/core/services/crypto_service.dart';
 import 'package:templefunds/core/models/account_model.dart';
 import 'package:templefunds/core/models/user_model.dart';
 
-class MembersNotifier extends StateNotifier<AsyncValue<List<User>>> {
-  final DatabaseHelper _dbHelper;
-  final Ref _ref; // Add ref
+class MembersNotifier extends AsyncNotifier<List<User>> {
+  late DatabaseHelper _dbHelper;
 
-  // Update constructor to accept Ref
-  MembersNotifier(this._dbHelper, this._ref)
-      : super(const AsyncValue.loading()) {
-    loadUsers();
+  @override
+  Future<List<User>> build() async {
+    _dbHelper = DatabaseHelper.instance;
+    return _fetchUsers();
   }
 
-  Future<void> loadUsers() async {
-    try {
-      state = const AsyncValue.loading();
-      final users = await _dbHelper.getAllUsers();
-      state = AsyncValue.data(users);
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
-    }
+  Future<List<User>> _fetchUsers() async {
+    final users = await _dbHelper.getAllUsers();
+    return users;
   }
 
   Future<void> addUser(User user) async {
@@ -43,43 +37,48 @@ class MembersNotifier extends StateNotifier<AsyncValue<List<User>>> {
       final accountWithOwner = newAccount.copyWith(ownerUserId: newUserId);
       await _dbHelper.addAccount(accountWithOwner);
     }
-    await loadUsers(); // Refresh the list to reflect the new user
+    ref.invalidateSelf(); // Refresh the provider
+    await future; // Wait for the refresh to complete
   }
 
   Future<void> updateUserStatus(int userId, String currentStatus) async {
     final newStatus = currentStatus == 'active' ? 'inactive' : 'active';
     await _dbHelper.updateUserStatus(userId, newStatus);
-    await loadUsers(); // Refresh the list
+    ref.invalidateSelf();
+    await future;
   }
 
   Future<void> updateUserRole(int userId, String newRole) async {
     await _dbHelper.updateUserRole(userId, newRole);
-    await loadUsers(); // Refresh the list
+    ref.invalidateSelf();
+    await future;
   }
 
   Future<void> updateUserProfile(int userId, User user) async {
+    // Get the old state before making changes
+    final previousState = await future;
     try {
-      await _dbHelper.updateUserProfile(userId, user);
       // Optimistically update the state
-      state = state.whenData((users) {
-        return [
-          for (final u in users)
-            if (u.id == userId) user else u,
-        ];
-      });
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
+      state = AsyncValue.data([
+        for (final u in previousState)
+          if (u.id == userId) user else u,
+      ]);
+      await _dbHelper.updateUserProfile(userId, user);
+    } catch (e) {
+      // If error, revert to the old state
+      state = AsyncValue.data(previousState);
+      // And rethrow the error to be caught by the UI
       rethrow;
     }
-    // No need to call loadUsers() here, as we optimistically updated the state.
   }
 
   Future<String> resetId2(int userId) async {
     final newId2 = (1000 + Random().nextInt(9000)).toString();
     // Hash the new ID2 before updating the database
-    final hashedId2 = _ref.read(cryptoServiceProvider).hashString(newId2);
+    final hashedId2 = ref.read(cryptoServiceProvider).hashString(newId2);
     await _dbHelper.updateUserId2(userId, hashedId2);
-    await loadUsers(); // Refresh the list
+    ref.invalidateSelf();
+    await future;
     return newId2;
   }
 
@@ -100,13 +99,11 @@ class MembersNotifier extends StateNotifier<AsyncValue<List<User>>> {
   }
 }
 
-final membersProvider =
-    StateNotifierProvider<MembersNotifier, AsyncValue<List<User>>>((ref) {
-  // Pass ref to the constructor
-  return MembersNotifier(DatabaseHelper.instance, ref);
+final membersProvider = AsyncNotifierProvider<MembersNotifier, List<User>>(() {
+  return MembersNotifier();
 });
 
-final memberByIdProvider = Provider.autoDispose.family<AsyncValue<User?>, int>((
+final memberByIdProvider = Provider.autoDispose.family<User?, int>((
   ref,
   id,
 ) {
@@ -114,10 +111,10 @@ final memberByIdProvider = Provider.autoDispose.family<AsyncValue<User?>, int>((
   return membersAsync.when(
     data: (members) {
       // Use firstWhereOrNull from the collection package to safely find the user.
-      final user = members.firstWhereOrNull((user) => user.id == id);
-      return AsyncValue.data(user);
+      return members.firstWhereOrNull((user) => user.id == id);
     },
-    loading: () => const AsyncValue.loading(),
-    error: (e, s) => AsyncValue.error(e, s),
+    // While loading or in error, we don't have a user.
+    loading: () => null,
+    error: (e, s) => null,
   );
 });

@@ -2,61 +2,53 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/database/database_helper.dart';
 import '../../../core/models/transaction_model.dart';
 
-class TransactionsNotifier extends StateNotifier<AsyncValue<List<Transaction>>> {
-  final DatabaseHelper _dbHelper;
+class TransactionsNotifier extends AsyncNotifier<List<Transaction>> {
+  late DatabaseHelper _dbHelper;
 
-  TransactionsNotifier(this._dbHelper) : super(const AsyncValue.loading()) {
-    loadTransactions();
-  }
-
-  Future<void> loadTransactions() async {
-    try {
-      state = const AsyncValue.loading();
-      final transactions = await _dbHelper.getAllTransactions();
-      state = AsyncValue.data(transactions);
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
-    }
+  @override
+  Future<List<Transaction>> build() async {
+    _dbHelper = DatabaseHelper.instance;
+    return _dbHelper.getAllTransactions();
   }
 
   Future<void> addTransaction(Transaction transaction) async {
     await _dbHelper.addTransaction(transaction);
-    // Refresh the list to show the new transaction at the top.
-    // Using loadTransactions() is simpler than trying to insert it into the state manually.
-    await loadTransactions();
+    ref.invalidateSelf();
+    await future;
   }
 
   Future<void> addMultipleTransactions(List<Transaction> transactions) async {
     // ใช้เมธอดใหม่ที่ทำงานแบบ Batch และ Atomic จาก database helper
     await _dbHelper.addMultipleTransactionsInBatch(transactions);
-    await loadTransactions();
+    ref.invalidateSelf();
+    await future;
   }
 
   Future<void> deleteTransaction(String transactionId) async {
+    final previousState = await future;
     try {
-      await _dbHelper.deleteTransaction(transactionId);
       // Optimistically update the state to remove the item immediately
-      // for a better user experience.
-      state = state.whenData((transactions) =>
-          transactions.where((t) => t.id != transactionId).toList());
+      state = AsyncValue.data(
+          previousState.where((t) => t.id != transactionId).toList());
+      await _dbHelper.deleteTransaction(transactionId);
     } catch (e) {
-      // If deletion fails, reload the original list to be safe.
-      loadTransactions();
+      // If deletion fails, revert to the original list.
+      state = AsyncValue.data(previousState);
       rethrow;
     }
   }
 }
 
 final transactionsProvider =
-    StateNotifierProvider<TransactionsNotifier, AsyncValue<List<Transaction>>>((ref) {
-  return TransactionsNotifier(DatabaseHelper.instance);
+    AsyncNotifierProvider<TransactionsNotifier, List<Transaction>>(() {
+  return TransactionsNotifier();
 });
 
 /// A provider that filters the main transaction list based on an account ID.
 /// This is more efficient than re-fetching from the DB as it reuses the
 /// already loaded data from [transactionsProvider].
-final filteredTransactionsProvider =
-    Provider.autoDispose.family<AsyncValue<List<Transaction>>, int>((ref, accountId) {
+final filteredTransactionsProvider = Provider.autoDispose
+    .family<AsyncValue<List<Transaction>>, int>((ref, accountId) {
   final allTransactionsAsync = ref.watch(transactionsProvider);
 
   return allTransactionsAsync.when(
@@ -73,12 +65,14 @@ final filteredTransactionsProvider =
 /// A provider to get the total balance for a filtered list of transactions.
 final filteredBalanceProvider =
     Provider.autoDispose.family<double, int>((ref, accountId) {
-  final filteredTransactionsAsync = ref.watch(filteredTransactionsProvider(accountId));
-
-  return filteredTransactionsAsync.when(
-    data: (transactions) => transactions.fold(
-        0.0, (sum, t) => sum + (t.type == 'income' ? t.amount : -t.amount)),
-    loading: () => 0.0,
-    error: (err, stack) => 0.0,
-  );
+  // Watch the main provider and select the calculated value.
+  // This is more efficient as it only rebuilds if the calculated sum changes.
+  return ref.watch(transactionsProvider).when(
+        data: (transactions) => transactions
+            .where((t) => t.accountId == accountId)
+            .fold(0.0,
+                (sum, t) => sum + (t.type == 'income' ? t.amount : -t.amount)),
+        loading: () => 0.0, // Return 0 while loading
+        error: (e, s) => 0.0, // Return 0 on error
+      );
 });

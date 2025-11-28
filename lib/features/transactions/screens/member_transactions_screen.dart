@@ -105,18 +105,23 @@ class _MemberTransactionsScreenState
 
   @override
   Widget build(BuildContext context) {
-    final userAsync = ref.watch(memberByIdProvider(widget.userId));
+    // Watch the base provider to handle loading/error for the whole user list
+    final membersAsync = ref.watch(membersProvider);
     final accountsAsync = ref.watch(allAccountsProvider);
 
-    return userAsync.when(
+    return membersAsync.when(
       loading: () =>
           const Scaffold(body: Center(child: CircularProgressIndicator())),
       error: (e, s) => Scaffold(
           appBar: AppBar(), body: Center(child: Text('ไม่พบข้อมูลผู้ใช้: $e'))),
-      data: (user) {
+      data: (members) {
+        // Find the specific user from the loaded list
+        final user = members.firstWhereOrNull((u) => u.id == widget.userId);
+
         if (user == null) {
           return Scaffold(
-              appBar: AppBar(),
+              appBar:
+                  AppBar(title: const Text('เกิดข้อผิดพลาด')), // Add a title
               body: const Center(child: Text('ไม่พบข้อมูลผู้ใช้')));
         }
 

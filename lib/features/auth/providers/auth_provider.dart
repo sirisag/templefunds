@@ -63,14 +63,17 @@ class AuthState {
 }
 
 // Part 3: Create the StateNotifier
-class AuthNotifier extends StateNotifier<AuthState> {
-  final Ref _ref;
-  final DatabaseHelper _dbHelper;
-  final SecureStorageService _secureStorage;
+class AuthNotifier extends Notifier<AuthState> {
+  late DatabaseHelper _dbHelper;
+  late SecureStorageService _secureStorage;
 
-  AuthNotifier(this._ref, this._dbHelper, this._secureStorage)
-      : super(AuthState()) {
+  @override
+  AuthState build() {
+    _dbHelper = DatabaseHelper.instance;
+    _secureStorage = SecureStorageService();
     _init();
+    // Return the initial state. The _init method will update it asynchronously.
+    return AuthState();
   }
 
   Future<void> _init() async {
@@ -232,7 +235,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       }
 
       // Hash the provided ID2 and compare
-      final hashedId2 = _ref.read(cryptoServiceProvider).hashString(id2);
+      final hashedId2 = ref.read(cryptoServiceProvider).hashString(id2);
       if (user.userId2 != hashedId2) {
         throw Exception('รหัสยืนยันตัวตนไม่ถูกต้อง');
       }
@@ -281,7 +284,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       // 1. Create Admin User
       final adminId2 = (1000 + Random().nextInt(9000)).toString();
       final hashedAdminId2 =
-          _ref.read(cryptoServiceProvider).hashString(adminId2);
+          ref.read(cryptoServiceProvider).hashString(adminId2);
       var adminUser = User(
         userId1: adminId1,
         userId2: hashedAdminId2,
@@ -312,14 +315,14 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
       // If a logo is provided, save it using the centralized homeStyleProvider.
       if (logoImageFile != null) {
-        await _ref
+        await ref
             .read(homeStyleProvider.notifier)
             .updateAndSaveStyle(imageFile: logoImageFile);
       }
 
       // Invalidate providers to force UI refresh
-      _ref.invalidate(templeNameProvider);
-      _ref.invalidate(allAccountsProvider);
+      ref.invalidate(templeNameProvider);
+      ref.invalidate(allAccountsProvider);
 
       // 5. Set user object with new ID
       adminUser = adminUser.copyWith(id: newAdminId);
@@ -380,7 +383,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       final timestampKey =
           match.group(1)!.replaceAll('_', ''); // Key is yyyyMMddHHmm
 
-      final cryptoService = _ref.read(cryptoServiceProvider);
+      final cryptoService = ref.read(cryptoServiceProvider);
       final decryptedJsonBytes = cryptoService.decryptData(
         encryptedBytes,
         timestampKey,
@@ -424,7 +427,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       tempFile = null; // Prevent deletion in the finally block.
 
       // Invalidate the provider so the UI re-fetches the temple name from the new DB.
-      _ref.invalidate(templeNameProvider);
+      ref.invalidate(templeNameProvider);
 
       // 7. Reset the auth state completely.
       await logout();
@@ -517,6 +520,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
 }
 
 // Part 4: Define the provider itself
-final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
-  return AuthNotifier(ref, DatabaseHelper.instance, SecureStorageService());
+final authProvider = NotifierProvider<AuthNotifier, AuthState>(() {
+  return AuthNotifier();
 });

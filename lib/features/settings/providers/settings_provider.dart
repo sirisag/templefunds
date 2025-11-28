@@ -34,18 +34,20 @@ final templeLogoProvider = FutureProvider<String?>((ref) async {
 });
 
 /// Notifier for handling settings updates.
-class SettingsNotifier extends StateNotifier<AsyncValue<void>> {
-  final Ref _ref;
-  final DatabaseHelper _dbHelper;
+class SettingsNotifier extends Notifier<AsyncValue<void>> {
+  late DatabaseHelper _dbHelper;
 
-  SettingsNotifier(this._ref, this._dbHelper)
-      : super(const AsyncValue.data(null));
+  @override
+  AsyncValue<void> build() {
+    _dbHelper = DatabaseHelper.instance;
+    return const AsyncValue.data(null);
+  }
 
   Future<void> updateTempleName(String newName) async {
     state = const AsyncValue.loading();
     try {
       await _dbHelper.setAppMetadata('temple_name', newName);
-      _ref.invalidate(templeNameProvider); // Force refresh
+      ref.invalidate(templeNameProvider); // Force refresh
       state = const AsyncValue.data(null);
     } catch (e) {
       state = AsyncValue.error(e, StackTrace.current);
@@ -57,7 +59,7 @@ class SettingsNotifier extends StateNotifier<AsyncValue<void>> {
     state = const AsyncValue.loading();
     try {
       await _dbHelper.setAppMetadata('export_file_prefix', newPrefix);
-      _ref.invalidate(exportFilePrefixProvider); // Force refresh
+      ref.invalidate(exportFilePrefixProvider); // Force refresh
       state = const AsyncValue.data(null);
     } catch (e) {
       state = AsyncValue.error(e, StackTrace.current);
@@ -69,7 +71,7 @@ class SettingsNotifier extends StateNotifier<AsyncValue<void>> {
     state = const AsyncValue.loading();
     try {
       await _dbHelper.setAppMetadata('theme_seed_color', colorName);
-      _ref.invalidate(themeSeedColorProvider); // Force refresh
+      ref.invalidate(themeSeedColorProvider); // Force refresh
       state = const AsyncValue.data(null);
     } catch (e) {
       state = AsyncValue.error(e, StackTrace.current);
@@ -90,7 +92,7 @@ class SettingsNotifier extends StateNotifier<AsyncValue<void>> {
       await logoFile.copy(newPath);
 
       await _dbHelper.setAppMetadata('temple_logo_path', newPath);
-      _ref.invalidate(templeLogoProvider); // Force refresh
+      ref.invalidate(templeLogoProvider); // Force refresh
       state = const AsyncValue.data(null);
     } catch (e) {
       state = AsyncValue.error(e, StackTrace.current);
@@ -101,8 +103,8 @@ class SettingsNotifier extends StateNotifier<AsyncValue<void>> {
 
 /// Provider for the SettingsNotifier.
 final settingsProvider =
-    StateNotifierProvider<SettingsNotifier, AsyncValue<void>>((ref) {
-  return SettingsNotifier(ref, DatabaseHelper.instance);
+    NotifierProvider<SettingsNotifier, AsyncValue<void>>(() {
+  return SettingsNotifier();
 });
 
 // --- Local Device Customization Providers ---
@@ -136,28 +138,21 @@ class HomeStyleState {
   }
 }
 
-class HomeStyleNotifier extends StateNotifier<AsyncValue<HomeStyleState>> {
-  HomeStyleNotifier() : super(const AsyncValue.loading()) {
-    _loadStyle();
-  }
-
+class HomeStyleNotifier extends AsyncNotifier<HomeStyleState> {
   static const _pathKey = 'home_style_image_path';
   static const _radiusKey = 'home_style_corner_radius';
   static const _widthKey = 'home_style_width';
   static const _heightKey = 'home_style_height';
 
-  Future<void> _loadStyle() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      state = AsyncValue.data(HomeStyleState(
-        imagePath: prefs.getString(_pathKey),
-        cornerRadius: prefs.getDouble(_radiusKey) ?? 30.0,
-        widthMultiplier: prefs.getDouble(_widthKey) ?? 0.8,
-        heightMultiplier: prefs.getDouble(_heightKey) ?? 0.5,
-      ));
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
-    }
+  @override
+  Future<HomeStyleState> build() async {
+    final prefs = await SharedPreferences.getInstance();
+    return HomeStyleState(
+      imagePath: prefs.getString(_pathKey),
+      cornerRadius: prefs.getDouble(_radiusKey) ?? 30.0,
+      widthMultiplier: prefs.getDouble(_widthKey) ?? 0.8,
+      heightMultiplier: prefs.getDouble(_heightKey) ?? 0.5,
+    );
   }
 
   Future<void> updateAndSaveStyle({
@@ -192,6 +187,6 @@ class HomeStyleNotifier extends StateNotifier<AsyncValue<HomeStyleState>> {
 }
 
 final homeStyleProvider =
-    StateNotifierProvider<HomeStyleNotifier, AsyncValue<HomeStyleState>>((ref) {
+    AsyncNotifierProvider<HomeStyleNotifier, HomeStyleState>(() {
   return HomeStyleNotifier();
 });
