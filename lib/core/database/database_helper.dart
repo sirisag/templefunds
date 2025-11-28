@@ -60,50 +60,6 @@ class DatabaseHelper {
     }
   }
 
-  /// Deletes the entire database file from the device.
-  Future<void> deleteDatabaseFile() async {
-    // First, ensure the database is closed to release any file locks.
-    await close();
-    final dbPath = await getDatabasesPath();
-    final path = p.join(dbPath, 'temple_funds.db');
-    if (await databaseExists(path)) {
-      await deleteDatabase(path);
-    }
-  }
-
-  /// Validates that the database at the given path has the required table structure.
-  /// Throws an exception if validation fails.
-  Future<void> validateDatabaseFile(String path) async {
-    Database? db;
-    try {
-      db = await openDatabase(path, readOnly: true);
-      const requiredTables = {
-        'users',
-        'accounts',
-        'transactions',
-        'app_metadata'
-      };
-      final tablesResult = await db
-          .rawQuery("SELECT name FROM sqlite_master WHERE type='table'");
-      final existingTables =
-          tablesResult.map((row) => row['name'] as String).toSet();
-
-      final missingTables = requiredTables.difference(existingTables);
-
-      if (missingTables.isNotEmpty) {
-        throw Exception(
-            'ไฟล์ข้อมูลไม่ถูกต้อง (ขาดตาราง: ${missingTables.join(', ')})');
-      }
-    } catch (e) {
-      // Re-throw our specific exception or a more generic one if it's not ours.
-      if (e.toString().contains('ขาดตาราง')) rethrow;
-      throw Exception(
-          'ไม่สามารถเปิดไฟล์ข้อมูลได้ อาจเป็นไฟล์ที่เสียหายหรือไม่ใช่ไฟล์ฐานข้อมูล');
-    } finally {
-      await db?.close();
-    }
-  }
-
   /// This method is called only when the database is created for the first time.
   /// It creates all the necessary tables.
   Future<void> _onCreate(Database db, int version) async {
@@ -186,6 +142,50 @@ class DatabaseHelper {
     }
   }
 
+  /// Deletes the entire database file from the device.
+  Future<void> deleteDatabaseFile() async {
+    // First, ensure the database is closed to release any file locks.
+    await close();
+    final dbPath = await getDatabasesPath();
+    final path = p.join(dbPath, 'temple_funds.db');
+    if (await databaseExists(path)) {
+      await deleteDatabase(path);
+    }
+  }
+
+  /// Validates that the database at the given path has the required table structure.
+  /// Throws an exception if validation fails.
+  Future<void> validateDatabaseFile(String path) async {
+    Database? db;
+    try {
+      db = await openDatabase(path, readOnly: true);
+      const requiredTables = {
+        'users',
+        'accounts',
+        'transactions',
+        'app_metadata'
+      };
+      final tablesResult = await db
+          .rawQuery("SELECT name FROM sqlite_master WHERE type='table'");
+      final existingTables =
+          tablesResult.map((row) => row['name'] as String).toSet();
+
+      final missingTables = requiredTables.difference(existingTables);
+
+      if (missingTables.isNotEmpty) {
+        throw Exception(
+            'ไฟล์ข้อมูลไม่ถูกต้อง (ขาดตาราง: ${missingTables.join(', ')})');
+      }
+    } catch (e) {
+      // Re-throw our specific exception or a more generic one if it's not ours.
+      if (e.toString().contains('ขาดตาราง')) rethrow;
+      throw Exception(
+          'ไม่สามารถเปิดไฟล์ข้อมูลได้ อาจเป็นไฟล์ที่เสียหายหรือไม่ใช่ไฟล์ฐานข้อมูล');
+    } finally {
+      await db?.close();
+    }
+  }
+
   // --- CRUD Methods for 'app_metadata' table ---
 
   /// Sets a key-value pair in the metadata table.
@@ -205,6 +205,23 @@ class DatabaseHelper {
         where: 'key = ?', whereArgs: [key], limit: 1);
     if (result.isNotEmpty) {
       return result.first['value'] as String?;
+    }
+    return null;
+  }
+
+  /// Fetches the timestamp of the most recent transaction.
+  /// Returns null if there are no transactions.
+  Future<DateTime?> getLatestTransactionTimestamp() async {
+    final db = await database;
+    // Use a try-catch block in case the database is empty or doesn't exist yet.
+    try {
+      final result = await db.query('transactions',
+          orderBy: 'createdAt DESC', limit: 1, columns: ['createdAt']);
+      if (result.isNotEmpty) {
+        return DateTime.parse(result.first['createdAt'] as String);
+      }
+    } catch (e) {
+      return null; // Table might not exist, or other errors.
     }
     return null;
   }

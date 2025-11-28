@@ -406,7 +406,7 @@ class _DailySummaryPageState extends ConsumerState<_DailySummaryPage> {
                               ),
                               TextSpan(
                                 text:
-                                    ' (ID:${owner?.userId1 ?? ''}) \n${DateFormatter.formatBE(transaction.transactionDate.toLocal(), "d MMM yyyy (HH:mm'น.')")} \n[บันทึกโดย]: ${creatorName}',
+                                    ' (ID:${owner?.userId1 ?? ''}) \n${DateFormatter.formatBE(transaction.transactionDate.toLocal(), "d MMM yyyy (HH:mm'น.')")} \n[บันทึกโดย]: ',
                               ),
                             ],
                           ),
@@ -429,7 +429,7 @@ class _DailySummaryPageState extends ConsumerState<_DailySummaryPage> {
                               tooltip: 'ดูใบเสร็จ',
                             ),
                           Text(
-                            '$amountPrefix฿${NumberFormat("#,##0").format(transaction.amount)}',
+                            '฿${NumberFormat("#,##0").format(transaction.amount)}',
                             style: TextStyle(
                               color: amountColor,
                               fontWeight: FontWeight.bold,

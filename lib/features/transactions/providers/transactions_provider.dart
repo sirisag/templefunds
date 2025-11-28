@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/database/database_helper.dart';
 import '../../../core/models/transaction_model.dart';
@@ -75,4 +76,30 @@ final filteredBalanceProvider =
         loading: () => 0.0, // Return 0 while loading
         error: (e, s) => 0.0, // Return 0 on error
       );
+});
+
+/// A record to hold the parameters for the audited transactions family provider.
+typedef AuditFilter = ({int accountId, int year});
+
+/// A provider that filters transactions for auditing purposes.
+/// It finds transactions where the transaction date and creation date are different,
+/// indicating a back-dated entry, and filters them by year.
+final auditedTransactionsProvider = Provider.autoDispose
+    .family<AsyncValue<List<Transaction>>, AuditFilter>((ref, filter) {
+  final allTransactionsAsync = ref.watch(transactionsProvider);
+
+  return allTransactionsAsync.when(
+    data: (transactions) {
+      final audited = transactions.where((t) {
+        final txDate = DateUtils.dateOnly(t.transactionDate.toLocal());
+        final createdDate = DateUtils.dateOnly(t.createdAt.toLocal());
+        return t.accountId == filter.accountId &&
+            !DateUtils.isSameDay(txDate, createdDate) &&
+            txDate.year == filter.year;
+      }).toList();
+      return AsyncValue.data(audited);
+    },
+    loading: () => const AsyncValue.loading(),
+    error: (err, stack) => AsyncValue.error(err, stack),
+  );
 });

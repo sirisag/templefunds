@@ -115,6 +115,28 @@ class _AddEditMemberScreenState extends ConsumerState<AddEditMemberScreen> {
     }
   }
 
+  Future<void> _deleteProfileImage() async {
+    final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('ยืนยันการลบรูปภาพ'),
+            content: const Text('คุณต้องการลบรูปภาพโปรไฟล์นี้ใช่หรือไม่?'),
+            actions: [
+              TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(false),
+                  child: const Text('ยกเลิก')),
+              TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(true),
+                  child: const Text('ลบ')),
+            ],
+          ),
+        ) ??
+        false;
+    if (confirmed) {
+      setState(() => _profileImageFile = null);
+    }
+  }
+
   String _getRoleDisplayName(UserRole role) {
     switch (role) {
       case UserRole.Admin:
@@ -227,25 +249,35 @@ class _AddEditMemberScreenState extends ConsumerState<AddEditMemberScreen> {
 
     if (confirmed) {
       String? profileImagePath;
+
       if (_profileImageFile != null) {
-        // Delete the old image if it exists and we are picking a new one
-        if (widget.userToEdit?.profileImage != null) {
+        // Case 1: A new image is set (or an existing one is kept).
+        // If we are editing and there's a new image that is different from the old one, delete the old file.
+        if (widget.userToEdit != null &&
+            widget.userToEdit!.profileImage != null) {
+          final oldFile = File(widget.userToEdit!.profileImage!);
+          if (oldFile.path != _profileImageFile!.path &&
+              await oldFile.exists()) {
+            await oldFile.delete();
+          }
+        }
+        // Copy the new (or existing but re-confirmed) image to a permanent location.
+        final appDocsDir = await getApplicationDocumentsDirectory();
+        final fileExtension = p.extension(_profileImageFile!.path);
+        final newFileName = 'profile_${const Uuid().v4()}$fileExtension';
+        profileImagePath = p.join(appDocsDir.path, newFileName);
+        await _profileImageFile!.copy(profileImagePath);
+      } else {
+        // Case 2: No image is set (_profileImageFile is null). This means the user wants to remove the image.
+        // If we are in edit mode and there was an old image, delete it.
+        if (widget.userToEdit != null &&
+            widget.userToEdit!.profileImage != null) {
           final oldFile = File(widget.userToEdit!.profileImage!);
           if (await oldFile.exists()) {
             await oldFile.delete();
           }
         }
-
-        final appDocsDir = await getApplicationDocumentsDirectory();
-        final fileExtension = p.extension(_profileImageFile!.path);
-        // Use a unique name to avoid caching issues
-        final newFileName = 'profile_${const Uuid().v4()}$fileExtension';
-        profileImagePath = p.join(appDocsDir.path, newFileName);
-        await _profileImageFile!.copy(profileImagePath);
-      } else if (widget.userToEdit != null) {
-        // If in edit mode and no new image is picked, keep the old path.
-        // If the user deleted their image, this will be null.
-        profileImagePath = widget.userToEdit?.profileImage;
+        profileImagePath = null; // Ensure the path is null in the database.
       }
 
       if (widget.userToEdit == null) {
@@ -275,7 +307,8 @@ class _AddEditMemberScreenState extends ConsumerState<AddEditMemberScreen> {
           specialTitle: _specialTitleController.text.trim(),
           phoneNumber: _phoneNumberController.text.trim(),
           email: _emailController.text.trim(),
-          profileImage: profileImagePath,
+          profileImage:
+              profileImagePath, // This will be null if the image was removed.
           role: _selectedRole,
         );
         await notifier.updateUserProfile(widget.userToEdit!.id!, updatedUser);
@@ -314,15 +347,33 @@ class _AddEditMemberScreenState extends ConsumerState<AddEditMemberScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               GestureDetector(
-                onTap: _pickImage,
-                child: CircleAvatar(
-                  radius: 60,
-                  backgroundColor: Colors.grey.shade200,
-                  backgroundImage: imageProvider,
-                  child: imageProvider == null
-                      ? Icon(Icons.add_a_photo_outlined,
-                          size: 40, color: Colors.grey.shade700)
-                      : null,
+                onTap:
+                    _pickImage, // Allow picking a new image by tapping the main avatar
+                child: Stack(
+                  alignment: Alignment.bottomRight,
+                  children: [
+                    CircleAvatar(
+                      radius: 60,
+                      backgroundColor: Colors.grey.shade200,
+                      backgroundImage: imageProvider,
+                      child: imageProvider == null
+                          ? Icon(Icons.add_a_photo_outlined,
+                              size: 40, color: Colors.grey.shade700)
+                          : null,
+                    ),
+                    if (imageProvider != null)
+                      Padding(
+                        padding: const EdgeInsets.all(4.0),
+                        child: CircleAvatar(
+                          radius: 16,
+                          backgroundColor: Colors.red,
+                          child: IconButton(
+                              icon: const Icon(Icons.delete,
+                                  color: Colors.white, size: 16),
+                              onPressed: _deleteProfileImage),
+                        ),
+                      )
+                  ],
                 ),
               ),
               const SizedBox(height: 24),

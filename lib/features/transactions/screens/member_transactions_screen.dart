@@ -6,16 +6,15 @@ import 'package:intl/intl.dart';
 import 'package:collection/collection.dart';
 import 'package:templefunds/core/models/account_model.dart';
 import 'package:templefunds/core/models/user_model.dart';
+import 'package:templefunds/features/auth/providers/auth_provider.dart';
 import 'package:templefunds/features/members/providers/members_provider.dart';
 import 'package:templefunds/core/services/report_generation_service.dart';
 import 'package:templefunds/features/members/widgets/user_profile_avatar.dart';
 import 'package:templefunds/features/transactions/providers/accounts_provider.dart';
 import 'package:templefunds/features/transactions/providers/transactions_provider.dart';
-import 'package:templefunds/features/transactions/providers/accounts_provider.dart';
 import 'package:templefunds/features/transactions/screens/add_single_transaction_screen.dart';
 import 'package:templefunds/core/utils/date_formatter.dart';
 import 'package:templefunds/features/transactions/screens/temple_transactions_screen.dart';
-import 'package:printing/printing.dart';
 
 class MemberTransactionsScreen extends ConsumerStatefulWidget {
   final int userId;
@@ -156,17 +155,19 @@ class _MemberTransactionsScreenState
                 )
               : _buildTransactionList(account),
           bottomNavigationBar: _buildBottomControls(),
-          floatingActionButton: account == null
-              ? null
-              : FloatingActionButton(
-                  onPressed: () {
-                    Navigator.of(context).push(MaterialPageRoute(
-                      builder: (_) => AddSingleTransactionScreen(
-                          preselectedAccount: account),
-                    ));
-                  },
-                  child: const Icon(Icons.add),
-                ),
+          floatingActionButton:
+              ref.watch(authProvider).user?.role == UserRole.Admin &&
+                      account != null
+                  ? FloatingActionButton(
+                      onPressed: () {
+                        Navigator.of(context).push(MaterialPageRoute(
+                          builder: (_) => AddSingleTransactionScreen(
+                              preselectedAccount: account),
+                        ));
+                      },
+                      child: const Icon(Icons.add),
+                    )
+                  : null,
           floatingActionButtonLocation:
               FloatingActionButtonLocation.centerDocked,
         );

@@ -5,12 +5,13 @@ import 'package:flutter_rounded_date_picker/flutter_rounded_date_picker.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:templefunds/core/models/account_model.dart';
+import 'package:templefunds/features/auth/providers/auth_provider.dart';
+import 'package:templefunds/core/models/user_model.dart';
 import 'package:templefunds/core/models/transaction_model.dart';
 import 'package:templefunds/core/services/report_generation_service.dart';
 import 'package:templefunds/features/members/providers/members_provider.dart';
 import 'package:templefunds/core/utils/date_formatter.dart';
 import 'package:templefunds/features/transactions/providers/accounts_provider.dart';
-import 'package:templefunds/features/members/widgets/user_profile_avatar.dart';
 import 'package:templefunds/features/settings/widgets/temple_avatar.dart';
 import 'package:templefunds/features/transactions/providers/transactions_provider.dart';
 import 'package:templefunds/features/transactions/screens/add_single_transaction_screen.dart';
@@ -155,17 +156,19 @@ class _TempleTransactionsScreenState
             )
           : _buildTransactionList(templeAccount),
       bottomNavigationBar: _buildBottomControls(),
-      floatingActionButton: templeAccount == null
-          ? null
-          : FloatingActionButton(
-              onPressed: () {
-                Navigator.of(context).push(MaterialPageRoute(
-                  builder: (_) => AddSingleTransactionScreen(
-                      preselectedAccount: templeAccount),
-                ));
-              },
-              child: const Icon(Icons.add),
-            ),
+      floatingActionButton:
+          ref.watch(authProvider).user?.role == UserRole.Admin &&
+                  templeAccount != null
+              ? FloatingActionButton(
+                  onPressed: () {
+                    Navigator.of(context).push(MaterialPageRoute(
+                      builder: (_) => AddSingleTransactionScreen(
+                          preselectedAccount: templeAccount),
+                    ));
+                  },
+                  child: const Icon(Icons.add),
+                )
+              : null,
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
     );
   }

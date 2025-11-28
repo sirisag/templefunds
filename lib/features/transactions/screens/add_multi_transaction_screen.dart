@@ -288,11 +288,13 @@ class _AddMultiTransactionScreenState
                 error: (err, stack) =>
                     const Center(child: Text('ไม่สามารถโหลดข้อมูลสมาชิกได้')),
                 data: (members) {
+                  // Use the new sorter function to arrange accounts logically
                   final sortedAccounts = sortAccountsForTransaction(
                     accounts,
                     members,
                     allTransactions,
                   );
+
                   final userMap = {for (var user in members) user.id: user};
 
                   return Padding(

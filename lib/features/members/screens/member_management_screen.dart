@@ -269,13 +269,6 @@ class MemberManagementScreen extends ConsumerWidget {
                             title: Text('แก้ไขข้อมูลส่วนตัว'),
                           ),
                         ),
-                      const PopupMenuItem<String>(
-                        value: 'change_pin',
-                        child: ListTile(
-                          leading: Icon(Icons.pin_outlined),
-                          title: Text('เปลี่ยนรหัส PIN'),
-                        ),
-                      ),
                       if (!isCurrentUser) ...[
                         PopupMenuItem<String>(
                           value: 'edit_profile',
@@ -302,6 +295,15 @@ class MemberManagementScreen extends ConsumerWidget {
                                 : Icons.toggle_on_outlined),
                             title: Text(
                                 isActive ? 'ระงับการใช้งาน' : 'เปิดใช้งาน'),
+                          ),
+                        ),
+                      ] else ...[
+                        // This block is only for the currently logged-in user (isCurrentUser is true)
+                        const PopupMenuItem<String>(
+                          value: 'change_pin',
+                          child: ListTile(
+                            leading: Icon(Icons.pin_outlined),
+                            title: Text('เปลี่ยนรหัส PIN'),
                           ),
                         ),
                       ],

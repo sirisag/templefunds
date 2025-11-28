@@ -1,14 +1,15 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:collection/collection.dart';
 import 'package:templefunds/core/services/report_generation_service.dart';
 import 'package:templefunds/core/widgets/scroll_indicator_wrapper.dart';
 import 'package:templefunds/core/widgets/app_dialogs.dart';
 import 'package:templefunds/core/widgets/navigation_tile.dart';
 import 'package:templefunds/features/auth/providers/auth_provider.dart';
-import 'package:templefunds/features/members/screens/change_pin_screen.dart';
-import 'package:templefunds/features/settings/providers/settings_provider.dart';
-import 'package:templefunds/features/settings/widgets/theme_color_picker.dart';
+import 'package:templefunds/features/transactions/providers/accounts_provider.dart';
+import 'package:templefunds/features/transactions/screens/audit_transactions_screen.dart';
+import 'package:templefunds/features/settings/screens/personal_settings_screen.dart';
 import 'package:templefunds/features/transactions/screens/member_transactions_screen.dart';
 import '../widgets/home_image_customizer.dart';
 
@@ -39,11 +40,25 @@ class _MemberHomeScreenState extends ConsumerState<MemberHomeScreen> {
   @override
   Widget build(BuildContext context) {
     final user = ref.watch(authProvider).user;
+    final accountsAsync = ref.watch(allAccountsProvider);
+
+    final String mainName =
+        ('${user?.firstName ?? ''} ${user?.lastName ?? ''}'.trim().isNotEmpty)
+            ? '${user!.firstName ?? ''} ${user.lastName ?? ''}'.trim()
+            : user?.nickname ?? '';
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('หน้าหลัก : พระ'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.settings_outlined),
+            tooltip: 'ตั้งค่า',
+            onPressed: () {
+              Navigator.of(context).push(MaterialPageRoute(
+                  builder: (_) => const PersonalSettingsScreen()));
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.logout),
             tooltip: 'ออกจากระบบ',
@@ -60,8 +75,30 @@ class _MemberHomeScreenState extends ConsumerState<MemberHomeScreen> {
               const SizedBox(height: 8),
               CustomizableHomeImage(pickedImageFile: _pickedImageFile),
               Center(
-                child: Text(user?.nickname ?? 'สมาชิก',
-                    style: Theme.of(context).textTheme.headlineSmall),
+                child: Column(
+                  children: [
+                    if (user?.specialTitle?.isNotEmpty ?? false)
+                      Text(
+                        user!.specialTitle!,
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context)
+                            .textTheme
+                            .headlineSmall
+                            ?.copyWith(fontWeight: FontWeight.bold),
+                      ),
+                    Text(
+                      mainName,
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                    if (user?.ordinationName?.isNotEmpty ?? false)
+                      Text(
+                        user!.ordinationName!,
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                  ],
+                ),
               ),
               const SizedBox(height: 24),
               NavigationTile(
@@ -79,34 +116,25 @@ class _MemberHomeScreenState extends ConsumerState<MemberHomeScreen> {
                   }
                 },
               ),
-              const SizedBox(height: 12),
-              NavigationTile(
-                icon: Icons.pin_outlined,
-                title: 'เปลี่ยนรหัส PIN',
-                subtitle: 'เปลี่ยนรหัส PIN 4 หลักสำหรับเข้าใช้งาน',
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => const ChangePinScreen(),
-                    ),
-                  );
+              const SizedBox(height: 4),
+              accountsAsync.when(
+                data: (accounts) {
+                  final memberAccount = accounts
+                      .firstWhereOrNull((acc) => acc.ownerUserId == user?.id);
+                  if (memberAccount == null) return const SizedBox.shrink();
+                  return NavigationTile(
+                      icon: Icons.rule_folder_outlined,
+                      title: 'ตรวจสอบธุรกรรมส่วนตัว',
+                      subtitle: 'ตรวจสอบรายการที่อาจบันทึกย้อนหลัง',
+                      onTap: () {
+                        Navigator.of(context).push(MaterialPageRoute(
+                            builder: (_) => AuditTransactionsScreen(
+                                account: memberAccount,
+                                title: 'ตรวจสอบธุรกรรมส่วนตัว')));
+                      });
                 },
-              ),
-              const SizedBox(height: 24),
-              const Text('เลือกธีมสีของแอป',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 8),
-              const ThemeColorPicker(),
-              const SizedBox(height: 24),
-              ImageCustomizationControls(
-                isLoading: _isLoading,
-                onImagePicked: (file) {
-                  setState(() {
-                    _pickedImageFile = file;
-                  });
-                },
-                imageFile: _pickedImageFile,
+                loading: () => const SizedBox.shrink(),
+                error: (e, s) => const SizedBox.shrink(),
               ),
               const SizedBox(height: 12),
             ],

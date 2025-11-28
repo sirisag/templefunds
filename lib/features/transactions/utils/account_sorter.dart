@@ -41,20 +41,21 @@ List<Account> sortAccountsForTransaction(
     if (userB == null) return -1;
 
     // Master always comes first among members
-    if (userA.role == UserRole.Master && userB.role != UserRole.Master) return -1;
-    if (userB.role == UserRole.Master && userA.role != UserRole.Master) return 1;
+    if (userA.role == UserRole.Master && userB.role != UserRole.Master)
+      return -1;
+    if (userB.role == UserRole.Master && userA.role != UserRole.Master)
+      return 1;
 
     // Sort by latest transaction date (descending)
     final dateA = latestTransactionDates[a.id];
     final dateB = latestTransactionDates[b.id];
 
-    if (dateA != null && dateB != null) {
-      final dateComparison = dateB.compareTo(dateA);
-      if (dateComparison != 0) return dateComparison;
-    }
-    if (dateA != null && dateB == null) return -1;
-    if (dateA == null && dateB != null) return 1;
+    if (dateA != null && dateB != null) return dateB.compareTo(dateA);
+    if (dateA != null)
+      return -1; // Accounts with transactions come before those without
+    if (dateB != null) return 1;
 
+    // Fallback to sorting by nickname if no transactions
     return a.name.compareTo(b.name);
   });
 

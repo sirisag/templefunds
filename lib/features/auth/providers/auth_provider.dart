@@ -1,11 +1,10 @@
 import 'dart:io';
 import 'dart:convert';
+import 'package:archive/archive_io.dart';
 import 'package:flutter/foundation.dart';
-import 'package:uuid/uuid.dart';
 import 'dart:math';
-
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../core/models/account_model.dart';
+
 import '../../../core/models/user_model.dart';
 import '../../../core/services/secure_storage_service.dart';
 import 'package:file_picker/file_picker.dart';
@@ -367,16 +366,16 @@ class AuthNotifier extends Notifier<AuthState> {
       }
 
       final extension = p.extension(pickedFilePath).toLowerCase();
-      if (extension != '.db' && extension != '.json') {
-        throw Exception('กรุณาเลือกไฟล์สำรองข้อมูล (.db หรือ .json) เท่านั้น');
+      if (extension != '.zip') {
+        throw Exception('กรุณาเลือกไฟล์สำรองข้อมูล (.zip) เท่านั้น');
       }
 
       // 2. Read the encrypted file bytes
-      final encryptedBytes = await File(pickedFilePath).readAsBytes();
+      final encryptedZipBytes = await File(pickedFilePath).readAsBytes();
 
       // 3. Decrypt the data
       // Extract the timestamp from the filename to use as the decryption key.
-      final match = RegExp(r'_(\d{8}_\d{4})\.json$').firstMatch(pickedFileName);
+      final match = RegExp(r'_(\d{8}_\d{4})\.zip$').firstMatch(pickedFileName);
       if (match == null || match.group(1) == null) {
         throw Exception('ชื่อไฟล์ไม่ถูกต้อง ไม่สามารถถอดรหัสได้');
       }
@@ -384,47 +383,93 @@ class AuthNotifier extends Notifier<AuthState> {
           match.group(1)!.replaceAll('_', ''); // Key is yyyyMMddHHmm
 
       final cryptoService = ref.read(cryptoServiceProvider);
-      final decryptedJsonBytes = cryptoService.decryptData(
-        encryptedBytes,
+      final decryptedZipBytes = cryptoService.decryptData(
+        encryptedZipBytes,
         timestampKey,
       );
 
-      // Decode the JSON and validate the Temple ID
-      final jsonString = utf8.decode(decryptedJsonBytes);
-      final importData = jsonDecode(jsonString);
-      final importMetadata = importData['metadata'];
+      // 4. Decode the ZIP archive from the decrypted bytes
+      final archive = ZipDecoder().decodeBytes(decryptedZipBytes);
+      final dbJsonFile = archive.findFile('database.json');
+
+      if (dbJsonFile == null) {
+        throw Exception('ไฟล์ ZIP ไม่ถูกต้อง (ไม่พบ database.json)');
+      }
+
+      // 5. Decode the JSON from the archive and validate the Temple ID
+      final dbJsonString = utf8.decode(dbJsonFile.content as List<int>);
+      final dbImportData = jsonDecode(dbJsonString);
+      final importMetadata = dbImportData['metadata'];
       final importTempleId = importMetadata['temple_id'];
 
       final currentTempleId = await _dbHelper.getAppMetadata('temple_id');
 
-      // This is the crucial check. If the app has a temple ID, it must match the file's ID.
       if (currentTempleId != null && importTempleId != currentTempleId) {
         throw Exception('ไฟล์สำรองข้อมูลนี้เป็นของวัดอื่น ไม่สามารถนำเข้าได้');
       }
 
-      // 4. Define paths and write decrypted data to a temporary file for validation
+      // New Check: Compare import file's timestamp with the latest data in the current DB.
+      final importTimestampString = importMetadata['export_timestamp'];
+      if (importTimestampString != null) {
+        final importTimestamp = DateTime.parse(importTimestampString);
+        final latestTransactionTimestamp =
+            await _dbHelper.getLatestTransactionTimestamp();
+
+        // If the current DB has data (latestTransactionTimestamp is not null)
+        // and the import file is older than or same as the latest data, throw an error.
+        if (latestTransactionTimestamp != null &&
+            !importTimestamp.isAfter(latestTransactionTimestamp)) {
+          throw Exception(
+            'ไฟล์สำรองข้อมูลนี้เก่ากว่าข้อมูลปัจจุบันที่มีอยู่ในเครื่อง ไม่สามารถนำเข้าเพื่อป้องกันข้อมูลสูญหายได้',
+          );
+        }
+      }
+      // End of New Check
+
+      // 6. Close existing DB, delete old files (DB and images)
+      await _dbHelper.close();
+      final appDocsDir = await getApplicationDocumentsDirectory();
       final dbDirectoryPath = await getDatabasesPath();
       final appDbPath = p.join(dbDirectoryPath, 'temple_funds.db');
-      final tempDbPath = p.join(dbDirectoryPath, 'import_temp.db');
-      tempFile = File(tempDbPath);
-      await tempFile.writeAsBytes(base64Decode(importData['data']));
 
-      // 5. Validate the structure of the temporary database file
-      await _dbHelper.validateDatabaseFile(tempDbPath);
-
-      // 6. If validation is successful, replace the old DB
-      // Close any existing database connection to release the file lock.
-      await _dbHelper.close();
-
-      // Delete the old DB if it exists.
+      // Delete old DB
       final oldDbFile = File(appDbPath);
       if (await oldDbFile.exists()) {
         await oldDbFile.delete();
       }
+      // Delete old images directory
+      final imageDir = Directory(p.join(appDocsDir.path));
+      if (await imageDir.exists()) {
+        await imageDir.delete(recursive: true);
+      }
+      await imageDir.create(recursive: true); // Recreate the base directory
+
+      // 7. Write new DB data to a temporary file for validation
+      final tempDbPath = p.join(dbDirectoryPath, 'import_temp.db');
+      tempFile = File(tempDbPath);
+      await tempFile.writeAsBytes(base64Decode(dbImportData['data']));
+
+      // 8. Validate the structure of the temporary database file
+      await _dbHelper.validateDatabaseFile(tempDbPath);
+
+      // 9. If validation is successful, replace the old DB
+      // Close connection again before renaming to release file lock on temp file.
+      await _dbHelper.close();
 
       // Rename the validated temp file to be the main DB.
       await tempFile.rename(appDbPath);
       tempFile = null; // Prevent deletion in the finally block.
+
+      // 8. Extract and write all image files from the archive
+      for (final file in archive.files) {
+        if (file.name.startsWith('images/')) {
+          final filename = p.relative(file.name, from: 'images/');
+          final newImagePath = p.join(appDocsDir.path, filename);
+          final newImageFile = File(newImagePath);
+          await newImageFile.create(recursive: true);
+          await newImageFile.writeAsBytes(file.content as List<int>);
+        }
+      }
 
       // Invalidate the provider so the UI re-fetches the temple name from the new DB.
       ref.invalidate(templeNameProvider);
