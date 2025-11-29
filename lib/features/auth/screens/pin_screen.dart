@@ -63,36 +63,49 @@ class _PinScreenState extends ConsumerState<PinScreen> {
 
     if (isSetupMode) {
       await notifier.setPinAndLogin(pin);
+      // After setup, the state becomes loggedIn, so we can navigate.
+      if (mounted && ref.read(authProvider).status == AuthStatus.loggedIn) {
+        _navigateToHomeScreen();
+      }
     } else {
-      await notifier.loginWithPin(pin);
-    }
-
-    if (mounted) {
-      setState(() {
-        _isLoading = false;
-      });
-
-      // After setting the PIN, the state becomes `loggedIn`.
-      // Instead of relying on the AuthWrapper, we explicitly navigate to the correct home screen
-      // to avoid race conditions and navigation stack issues.
-      final newAuthState = ref.read(authProvider);
-      if (newAuthState.status == AuthStatus.loggedIn) {
-        final user = newAuthState.user;
-        Widget homeScreen;
-        if (user?.role == UserRole.Admin) {
-          homeScreen = const AdminHomeScreen();
-        } else if (user?.role == UserRole.Master) {
-          homeScreen = const MasterHomeScreen();
+      final result = await notifier.loginWithPin(pin);
+      if (mounted) {
+        if (result == null) {
+          // Success
+          _navigateToHomeScreen();
         } else {
-          homeScreen = const MemberHomeScreen();
+          final (errorMessage, lockoutUntil) = result;
+          // Failure: Show dialog first
+          await showDialog(
+            context: context,
+            builder: (_) => LoginErrorDialog(
+                errorMessage: errorMessage, lockoutUntil: lockoutUntil),
+          );
         }
-        // Replace the entire navigation stack up to this point with the new home screen.
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => homeScreen),
-          (route) => false, // This predicate removes all previous routes
-        );
       }
     }
+
+    // This should only be called if login fails, to re-enable the button.
+    if (mounted && ref.read(authProvider).status != AuthStatus.loggedIn) {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  void _navigateToHomeScreen() {
+    final user = ref.read(authProvider).user;
+    Widget homeScreen;
+    if (user?.role == UserRole.Admin) {
+      homeScreen = const AdminHomeScreen();
+    } else if (user?.role == UserRole.Master) {
+      homeScreen = const MasterHomeScreen();
+    } else {
+      homeScreen = const MemberHomeScreen();
+    }
+    // Replace the entire navigation stack up to this point with the new home screen.
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => homeScreen),
+      (route) => false, // This predicate removes all previous routes
+    );
   }
 
   @override
@@ -101,21 +114,6 @@ class _PinScreenState extends ConsumerState<PinScreen> {
     final isSetupMode = authState.status == AuthStatus.requiresPinSetup;
     final canPop = Navigator.of(context).canPop();
     final homeStyleAsync = ref.watch(homeStyleProvider);
-
-    ref.listen<AuthState>(authProvider, (previous, next) {
-      if (next.errorMessage != null) {
-        showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (_) => LoginErrorDialog(
-            errorMessage: next.errorMessage!,
-            lockoutUntil: next.lockoutUntil,
-          ),
-        );
-        ref.read(authProvider.notifier).clearError();
-        _pinController.clear(); // Clear input on error
-      }
-    });
 
     return Scaffold(
       appBar: AppBar(

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:templefunds/features/settings/providers/settings_provider.dart';
+import 'package:templefunds/features/recovery/screens/use_recovery_code_screen.dart';
 import '../providers/auth_provider.dart';
 import '../widgets/login_error_dialog.dart';
 import 'pin_screen.dart';
@@ -36,40 +37,34 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       _isLoading = true;
     });
 
-    await ref.read(authProvider.notifier).loginWithIds(
+    final result = await ref.read(authProvider.notifier).loginWithIds(
           id1: _id1Controller.text.trim(),
           id2: _id2Controller.text.trim(),
         );
 
     if (mounted) {
-      setState(() {
-        _isLoading = false;
-      });
-
-      if (ref.read(authProvider).status == AuthStatus.requiresPinSetup) {
+      if (result == null) {
+        // Success
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (_) => const PinScreen()),
         );
+      } else {
+        final (errorMessage, lockoutUntil) = result;
+        // Failure: Show dialog first, then update UI
+        await showDialog(
+          context: context,
+          builder: (_) => LoginErrorDialog(
+            errorMessage: errorMessage,
+            lockoutUntil: lockoutUntil,
+          ),
+        );
+        setState(() => _isLoading = false);
       }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    ref.listen<AuthState>(authProvider, (previous, next) {
-      if (next.errorMessage != null) {
-        showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (_) => LoginErrorDialog(
-            errorMessage: next.errorMessage!,
-            lockoutUntil: next.lockoutUntil,
-          ),
-        );
-        ref.read(authProvider.notifier).clearError();
-      }
-    });
-
     final homeStyleAsync = ref.watch(homeStyleProvider);
 
     return Scaffold(
@@ -171,6 +166,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         icon: const Icon(Icons.login),
                         label: const Text('เข้าสู่ระบบ'),
                       ),
+                const SizedBox(height: 16),
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                          builder: (_) => const UseRecoveryCodeScreen()),
+                    );
+                  },
+                  child: const Text('ลืมรหัสผ่าน? ใช้รหัสกู้คืน'),
+                )
               ],
             ),
           ),

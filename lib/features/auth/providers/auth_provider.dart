@@ -14,6 +14,7 @@ import 'package:sqflite/sqflite.dart';
 import '../../../core/database/database_helper.dart';
 import '../../../core/services/crypto_service.dart';
 import '../../transactions/providers/accounts_provider.dart';
+import '../../recovery/providers/recovery_codes_provider.dart';
 import '../../settings/providers/settings_provider.dart';
 
 // Part 1: Define the possible authentication states
@@ -32,31 +33,23 @@ enum AuthStatus {
 class AuthState {
   final AuthStatus status;
   final User? user; // The user object when logged in or partially identified
-  final String? errorMessage;
   final DateTime? lastDbExport;
-  final DateTime? lockoutUntil;
 
   AuthState({
     this.status = AuthStatus.initializing,
     this.user,
-    this.errorMessage,
     this.lastDbExport,
-    this.lockoutUntil,
   });
 
   AuthState copyWith({
     AuthStatus? status,
     User? user,
-    String? errorMessage,
     DateTime? lastDbExport,
-    DateTime? lockoutUntil,
   }) {
     return AuthState(
       status: status ?? this.status,
-      user: user ?? this.user,
-      errorMessage: errorMessage, // Allow clearing the error message
+      user: user ?? this.user, // Allow clearing the error message
       lastDbExport: lastDbExport ?? this.lastDbExport,
-      lockoutUntil: lockoutUntil,
     );
   }
 }
@@ -140,9 +133,8 @@ class AuthNotifier extends Notifier<AuthState> {
       // Error during init, default to logged out
       debugPrint("[Auth] Error during initialization: $e");
       state = state.copyWith(
-        status: AuthStatus.loggedOut,
-        errorMessage: 'เกิดข้อผิดพลาดในการเริ่มต้น',
-      );
+          status: AuthStatus
+              .loggedOut); // No error reporting here, as UI is not ready
     }
     debugPrint("[Auth] Initialization complete. Final status: ${state.status}");
   }
@@ -153,10 +145,7 @@ class AuthNotifier extends Notifier<AuthState> {
     final lockoutTime = await _secureStorage.getLockoutEndTime();
     if (lockoutTime != null && lockoutTime.isAfter(DateTime.now())) {
       state = state.copyWith(
-        // Keep the current status (e.g., loggedOut or requiresPin)
         status: state.status,
-        errorMessage: 'มีการพยายามเข้าสู่ระบบผิดพลาดหลายครั้ง กรุณารอ',
-        lockoutUntil: lockoutTime,
       );
       return true;
     }
@@ -164,29 +153,25 @@ class AuthNotifier extends Notifier<AuthState> {
   }
 
   /// Handles the logic for a failed login attempt.
-  Future<void> _handleLoginFailure({required String baseErrorMessage}) async {
+  Future<(String, DateTime?)> _handleLoginFailure(
+      {required String baseErrorMessage}) async {
     final newFailureCount = await _secureStorage.incrementLoginFailureCount();
     const lockoutThreshold = 4;
 
+    String errorMessage;
+    DateTime? lockoutEndTime;
     if (newFailureCount >= lockoutThreshold) {
       // Lockout duration increases by 1 minute for each failure after the 2nd.
       final lockoutMinutes = newFailureCount - (lockoutThreshold - 1);
-      final lockoutEndTime = DateTime.now().add(
+      lockoutEndTime = DateTime.now().add(
         Duration(minutes: lockoutMinutes),
       );
       await _secureStorage.setLockoutEndTime(lockoutEndTime);
-      state = state.copyWith(
-        // Keep current status, but show lockout info
-        status: state.status,
-        errorMessage: '$baseErrorMessage และถูกล็อกชั่วคราว',
-        lockoutUntil: lockoutEndTime,
-      );
+      errorMessage = '$baseErrorMessage และถูกล็อกชั่วคราว';
     } else {
-      state = state.copyWith(
-        status: state.status,
-        errorMessage: baseErrorMessage,
-      );
+      errorMessage = baseErrorMessage;
     }
+    return (errorMessage, lockoutEndTime);
   }
 
   // This would be called from the PIN screen
@@ -198,35 +183,31 @@ class AuthNotifier extends Notifier<AuthState> {
     state = state.copyWith(
       status: AuthStatus.loggedIn,
       user: state.user,
-      errorMessage: null,
-      lockoutUntil: null,
     );
   }
 
   // This would be called from the PIN screen
-  Future<void> loginWithPin(String pin) async {
-    if (await _isCurrentlyLockedOut()) return;
+  Future<(String, DateTime?)?> loginWithPin(String pin) async {
+    if (await _isCurrentlyLockedOut())
+      return ('คุณถูกล็อกการใช้งานชั่วคราว', null);
 
     final isPinCorrect = await _secureStorage.verifyPin(pin);
     if (isPinCorrect) {
       await _secureStorage.resetLoginFailureCount();
-      // Explicitly set the status to loggedIn on successful PIN verification.
-      // The previous code was missing this, causing the UI to get stuck.
-      state = AuthState(
+      state = state.copyWith(
         status: AuthStatus.loggedIn,
-        user: state.user,
-        errorMessage: null,
-        lockoutUntil: null,
-        lastDbExport: state.lastDbExport,
       );
+      return null; // Success
     } else {
-      await _handleLoginFailure(baseErrorMessage: 'PIN ไม่ถูกต้อง');
+      return await _handleLoginFailure(baseErrorMessage: 'PIN ไม่ถูกต้อง');
     }
   }
 
   /// New method for the combined login screen.
-  Future<void> loginWithIds({required String id1, required String id2}) async {
-    if (await _isCurrentlyLockedOut()) return;
+  Future<(String, DateTime?)?> loginWithIds(
+      {required String id1, required String id2}) async {
+    if (await _isCurrentlyLockedOut())
+      return ('คุณถูกล็อกการใช้งานชั่วคราว', null);
     try {
       final user = await _dbHelper.getUserByUserId1(id1);
       if (user == null) {
@@ -249,13 +230,50 @@ class AuthNotifier extends Notifier<AuthState> {
       state = state.copyWith(
         status: AuthStatus.requiresPinSetup,
         user: user,
-        errorMessage: null,
-        lockoutUntil: null,
       );
+      return null; // Success
     } catch (e) {
-      await _handleLoginFailure(
+      return await _handleLoginFailure(
         baseErrorMessage: e.toString().replaceFirst("Exception: ", ""),
       );
+    }
+  }
+
+  /// Recovers an account using a recovery code.
+  Future<(String, DateTime?)?> recoverAccount({
+    required String userId1,
+    required String recoveryCode,
+  }) async {
+    if (await _isCurrentlyLockedOut())
+      return ('คุณถูกล็อกการใช้งานชั่วคราว', null);
+
+    try {
+      final user = await _dbHelper.getUserByUserId1(userId1);
+      if (user == null) {
+        throw Exception('ไม่พบผู้ใช้งานรหัสนี้');
+      }
+
+      final foundCode =
+          await _dbHelper.findUnusedRecoveryCode(user.id!, recoveryCode);
+      if (foundCode == null) {
+        throw Exception('รหัสกู้คืนไม่ถูกต้องหรือถูกใช้ไปแล้ว');
+      }
+
+      // Credentials are correct
+      await _secureStorage.resetLoginFailureCount();
+
+      // Mark the code as used
+      await _dbHelper.markRecoveryCodeAsUsed(foundCode['id'] as int);
+
+      // Update state to allow setting a new PIN
+      state = state.copyWith(
+        status: AuthStatus.requiresPinSetup,
+        user: user,
+      );
+      return null; // Success
+    } catch (e) {
+      return await _handleLoginFailure(
+          baseErrorMessage: e.toString().replaceFirst("Exception: ", ""));
     }
   }
 
@@ -319,29 +337,23 @@ class AuthNotifier extends Notifier<AuthState> {
             .updateAndSaveStyle(imageFile: logoImageFile);
       }
 
-      // Invalidate providers to force UI refresh
-      ref.invalidate(templeNameProvider);
-      ref.invalidate(allAccountsProvider);
+      // 5. Generate initial recovery codes for the new admin
+      await ref
+          .read(recoveryCodesProvider.notifier)
+          .regenerateCodes(newAdminId);
 
-      // 5. Set user object with new ID
-      adminUser = adminUser.copyWith(id: newAdminId);
-
-      // 6. Save PIN and log in
+      // 6. Save PIN, log in, and update user object in state
+      adminUser =
+          adminUser.copyWith(id: newAdminId); // Now set user object with new ID
       await _secureStorage.savePin(pin);
       await _secureStorage.saveLastUserId(newAdminId);
-
-      // 7. Update state to loggedIn
       state = state.copyWith(
         status: AuthStatus.loggedIn,
         user: adminUser,
-        errorMessage: null,
       );
       return adminId2; // Return the generated ID2 on success
     } catch (e) {
-      state = state.copyWith(
-        status: AuthStatus.loggedOut,
-        errorMessage: 'เกิดข้อผิดพลาดในการสร้างบัญชีผู้ดูแล',
-      );
+      // The error will be caught and returned by the UI layer
       return null; // Return null on failure
     }
   }
@@ -484,17 +496,12 @@ class AuthNotifier extends Notifier<AuthState> {
             'Invalid argument(s): Invalid or corrupted pad block',
           ) ||
           errorString.contains('bad padding')) {
-        state = state.copyWith(
-          errorMessage:
-              'นำเข้าไฟล์ไม่สำเร็จ: รหัสผ่านไม่ถูกต้อง หรือไฟล์เสียหาย',
-        );
+        throw Exception(
+            'นำเข้าไฟล์ไม่สำเร็จ: รหัสผ่านไม่ถูกต้อง หรือไฟล์เสียหาย');
       } else {
-        state = state.copyWith(
-          errorMessage:
-              'นำเข้าไฟล์ไม่สำเร็จ: ${errorString.replaceFirst("Exception: ", "")}',
-        );
+        throw Exception(
+            'นำเข้าไฟล์ไม่สำเร็จ: ${errorString.replaceFirst("Exception: ", "")}');
       }
-      return false;
     } finally {
       // Clean up the temp file if it still exists (e.g., on error).
       if (tempFile != null && await tempFile.exists()) {
@@ -525,8 +532,6 @@ class AuthNotifier extends Notifier<AuthState> {
     state = AuthState(
       status: AuthStatus.loggedOut,
       user: null, // Clear the partially logged-in user
-      errorMessage: null,
-      lockoutUntil: null,
       lastDbExport: state.lastDbExport,
     );
   }
@@ -554,13 +559,6 @@ class AuthNotifier extends Notifier<AuthState> {
     // The AuthWrapper will then show the appropriate screen (WelcomeScreen or LoginScreen)
     // on the next app start, which is the correct behavior.
     state = AuthState(status: AuthStatus.loggedOut);
-  }
-
-  /// Clears any existing error message from the state.
-  void clearError() {
-    if (state.errorMessage != null || state.lockoutUntil != null) {
-      state = state.copyWith(errorMessage: null, lockoutUntil: null);
-    }
   }
 }
 

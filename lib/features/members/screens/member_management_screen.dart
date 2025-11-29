@@ -4,12 +4,24 @@ import 'package:templefunds/core/models/user_model.dart';
 import 'package:templefunds/features/auth/providers/auth_provider.dart';
 import 'package:templefunds/features/members/providers/members_provider.dart';
 import 'package:templefunds/features/members/screens/change_pin_screen.dart';
+import 'package:templefunds/features/recovery/screens/recovery_codes_screen.dart';
 import 'package:templefunds/features/members/widgets/user_profile_avatar.dart';
 import 'package:templefunds/features/transactions/screens/member_transactions_screen.dart';
 import 'package:templefunds/features/members/screens/add_edit_member_screen.dart';
 
-class MemberManagementScreen extends ConsumerWidget {
+class MemberManagementScreen extends ConsumerStatefulWidget {
   const MemberManagementScreen({super.key});
+
+  @override
+  ConsumerState<MemberManagementScreen> createState() =>
+      _MemberManagementScreenState();
+}
+
+class _MemberManagementScreenState
+    extends ConsumerState<MemberManagementScreen> {
+  final _searchController = TextEditingController();
+  List<User> _allMembers = [];
+  List<User> _filteredMembers = [];
 
   String _getRoleDisplayName(UserRole role) {
     switch (role) {
@@ -21,6 +33,37 @@ class MemberManagementScreen extends ConsumerWidget {
       default:
         return 'พระลูกวัด';
     }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _searchController.addListener(_filterMembers);
+  }
+
+  @override
+  void dispose() {
+    _searchController.removeListener(_filterMembers);
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _filterMembers() {
+    final query = _searchController.text.toLowerCase().trim();
+    if (query.isEmpty) {
+      setState(() {
+        _filteredMembers = _allMembers;
+      });
+      return;
+    }
+
+    setState(() {
+      _filteredMembers = _allMembers.where((user) {
+        final nicknameMatch = user.nickname.toLowerCase().contains(query);
+        final idMatch = user.userId1.toLowerCase().contains(query);
+        return nicknameMatch || idMatch;
+      }).toList();
+    });
   }
 
   void _showResetId2Dialog(
@@ -134,12 +177,10 @@ class MemberManagementScreen extends ConsumerWidget {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        // This dialog is for changing nickname, should be replaced with a proper edit screen later
         title: Text('ยืนยันการ$actionText'),
         content:
             Text('คุณต้องการ$actionTextบัญชีของ ${user.nickname} ใช่หรือไม่?'),
         actions: [
-          // This dialog is for changing nickname, should be replaced with a proper edit screen later
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
             child: const Text('ยกเลิก'),
@@ -160,160 +201,220 @@ class MemberManagementScreen extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final membersAsync = ref.watch(membersProvider);
     final loggedInUser = ref.watch(authProvider).user;
 
     return Scaffold(
       appBar: AppBar(title: const Text('จัดการสมาชิก')),
-      body: membersAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (err, stack) => Center(child: Text('เกิดข้อผิดพลาด: $err')),
-        data: (members) {
-          if (members.isEmpty) {
-            return const Center(child: Text('ยังไม่มีสมาชิกในระบบ'));
-          }
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+            child: TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                labelText: 'ค้นหาสมาชิกจากชื่อเล่น หรือ ID',
+                prefixIcon: const Icon(Icons.search),
+                suffixIcon: _searchController.text.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear),
+                        onPressed: () {
+                          _searchController.clear();
+                        },
+                      )
+                    : null,
+              ),
+            ),
+          ),
+          const Divider(height: 1),
+          Expanded(
+            child: membersAsync.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (err, stack) => Center(child: Text('เกิดข้อผิดพลาด: ')),
+              data: (members) {
+                // Store the full list and initialize the filtered list
+                _allMembers = members;
+                // If the search controller is empty, show all members initially.
+                // Otherwise, the existing filter will be applied automatically by the listener.
+                if (_searchController.text.isEmpty) {
+                  _filteredMembers = _allMembers;
+                }
 
-          // Custom sorting: Admin -> Master -> Monk (alphabetical)
-          members.sort((a, b) {
-            int getRoleWeight(UserRole role) {
-              switch (role) {
-                case UserRole.Admin:
-                  return 0;
-                case UserRole.Master:
-                  return 1;
-                case UserRole.Monk:
-                default:
-                  return 2;
-              }
-            }
+                if (_allMembers.isEmpty) {
+                  return const Center(child: Text('ยังไม่มีสมาชิกในระบบ'));
+                }
 
-            final weightA = getRoleWeight(a.role);
-            final weightB = getRoleWeight(b.role);
+                if (_filteredMembers.isEmpty &&
+                    _searchController.text.isNotEmpty) {
+                  return Center(
+                    child: Text(
+                      'ไม่พบสมาชิกที่ตรงกับ "${_searchController.text}"',
+                      style: const TextStyle(fontSize: 16, color: Colors.grey),
+                    ),
+                  );
+                }
 
-            if (weightA != weightB) {
-              return weightA.compareTo(weightB);
-            }
-            // If roles are the same, sort by name
-            return a.nickname.compareTo(b.nickname);
-          });
+                // Sort the list that is actually being displayed
+                _filteredMembers.sort((a, b) {
+                  int getRoleWeight(UserRole role) {
+                    switch (role) {
+                      case UserRole.Admin:
+                        return 0;
+                      case UserRole.Master:
+                        return 1;
+                      case UserRole.Monk:
+                      default:
+                        return 2;
+                    }
+                  }
 
-          return ListView.builder(
-            padding: const EdgeInsets.only(
-              top: 8,
-              bottom: 80,
-            ), // Add padding for FAB
-            itemCount: members.length,
-            itemBuilder: (ctx, index) {
-              final user = members[index];
-              final bool isActive = user.status == 'active';
-              final bool isCurrentUser = user.id == loggedInUser?.id;
+                  final weightA = getRoleWeight(a.role);
+                  final weightB = getRoleWeight(b.role);
 
-              return Card(
-                color: isActive ? null : Colors.grey.shade300,
-                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                child: ListTile(
-                  leading: UserProfileAvatar(userId: user.id!, radius: 28),
-                  onTap: () {
-                    // Navigate to the member's transaction screen when tapped.
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) =>
-                            MemberTransactionsScreen(userId: user.id!),
+                  if (weightA != weightB) {
+                    return weightA.compareTo(weightB);
+                  }
+                  // If roles are the same, sort by name
+                  return a.nickname.compareTo(b.nickname);
+                });
+                return ListView.builder(
+                  padding: const EdgeInsets.only(
+                    top: 8,
+                    bottom: 80,
+                  ), // Add padding for FAB
+                  itemCount: _filteredMembers.length,
+                  itemBuilder: (ctx, index) {
+                    final user = _filteredMembers[index];
+                    final bool isActive = user.status == 'active';
+                    final bool isCurrentUser = user.id == loggedInUser?.id;
+
+                    return Card(
+                      color: isActive ? null : Colors.grey.shade300,
+                      margin: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 6),
+                      child: ListTile(
+                        leading:
+                            UserProfileAvatar(userId: user.id!, radius: 28),
+                        onTap: () {
+                          // Navigate to the member's transaction screen when tapped.
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) =>
+                                  MemberTransactionsScreen(userId: user.id!),
+                            ),
+                          );
+                        },
+                        title: Text(
+                            isCurrentUser
+                                ? '${user.nickname} (คุณ)'
+                                : user.nickname,
+                            style:
+                                const TextStyle(fontWeight: FontWeight.bold)),
+                        subtitle: Text(
+                          '${_getRoleDisplayName(user.role)} : ${user.userId1}',
+                        ),
+                        trailing: PopupMenuButton<String>(
+                          onSelected: (value) {
+                            if (value == 'reset_id2') {
+                              _showResetId2Dialog(context, ref, user);
+                            } else if (value == 'edit_profile') {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) =>
+                                      AddEditMemberScreen(userToEdit: user),
+                                ),
+                              );
+                            } else if (value == 'change_role') {
+                              _showChangeRoleDialog(context, ref, user);
+                            } else if (value == 'toggle_status') {
+                              _toggleStatus(context, ref, user);
+                            } else if (value == 'change_pin') {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => const ChangePinScreen(),
+                                ),
+                              );
+                            } else if (value == 'recovery_codes') {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => const RecoveryCodesScreen(),
+                                ),
+                              );
+                            }
+                          },
+                          itemBuilder: (BuildContext context) =>
+                              <PopupMenuEntry<String>>[
+                            const PopupMenuItem<String>(
+                              value: 'reset_id2',
+                              child: ListTile(
+                                leading: Icon(Icons.vpn_key_outlined),
+                                title: Text('รีเซ็ต ID ชุดที่ 2'),
+                              ),
+                            ),
+                            if (isCurrentUser)
+                              const PopupMenuItem<String>(
+                                value: 'edit_profile',
+                                child: ListTile(
+                                  leading: Icon(Icons.edit_outlined),
+                                  title: Text('แก้ไขข้อมูลส่วนตัว'),
+                                ),
+                              ),
+                            if (!isCurrentUser) ...[
+                              const PopupMenuItem<String>(
+                                value: 'edit_profile',
+                                child: ListTile(
+                                  leading: Icon(Icons.edit_outlined),
+                                  title: Text('แก้ไขข้อมูลส่วนตัว'),
+                                ),
+                              ),
+                              const PopupMenuItem<String>(
+                                value: 'change_role',
+                                child: ListTile(
+                                  leading: Icon(
+                                    Icons.admin_panel_settings_outlined,
+                                  ),
+                                  title: Text('เปลี่ยนบทบาท'),
+                                ),
+                              ),
+                              PopupMenuItem<String>(
+                                value: 'toggle_status',
+                                child: ListTile(
+                                  leading: Icon(isActive
+                                      ? Icons.toggle_off_outlined
+                                      : Icons.toggle_on_outlined),
+                                  title: Text(isActive
+                                      ? 'ระงับการใช้งาน'
+                                      : 'เปิดใช้งาน'),
+                                ),
+                              ),
+                            ] else ...[
+                              // This block is only for the currently logged-in user (isCurrentUser is true)
+                              const PopupMenuItem<String>(
+                                value: 'change_pin',
+                                child: ListTile(
+                                  leading: Icon(Icons.pin_outlined),
+                                  title: Text('เปลี่ยนรหัส PIN'),
+                                ),
+                              ),
+                              const PopupMenuItem<String>(
+                                value: 'recovery_codes',
+                                child: ListTile(
+                                  leading: Icon(Icons.shield_moon_outlined),
+                                  title: Text('รหัสผ่านฉุกเฉิน'),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
                       ),
                     );
                   },
-                  title: Text(
-                      isCurrentUser ? '${user.nickname} (คุณ)' : user.nickname,
-                      style: const TextStyle(fontWeight: FontWeight.bold)),
-                  subtitle: Text(
-                    '${_getRoleDisplayName(user.role)} : ${user.userId1}',
-                  ),
-                  trailing: PopupMenuButton<String>(
-                    onSelected: (value) {
-                      if (value == 'reset_id2') {
-                        _showResetId2Dialog(context, ref, user);
-                      } else if (value == 'edit_profile') {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) =>
-                                AddEditMemberScreen(userToEdit: user),
-                          ),
-                        );
-                      } else if (value == 'change_role') {
-                        _showChangeRoleDialog(context, ref, user);
-                      } else if (value == 'toggle_status') {
-                        _toggleStatus(context, ref, user);
-                      } else if (value == 'change_pin') {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => const ChangePinScreen(),
-                          ),
-                        );
-                      }
-                    },
-                    itemBuilder: (BuildContext context) =>
-                        <PopupMenuEntry<String>>[
-                      const PopupMenuItem<String>(
-                        value: 'reset_id2',
-                        child: ListTile(
-                          leading: Icon(Icons.vpn_key_outlined),
-                          title: Text('รีเซ็ต ID ชุดที่ 2'),
-                        ),
-                      ),
-                      if (isCurrentUser)
-                        const PopupMenuItem<String>(
-                          value: 'edit_profile',
-                          child: ListTile(
-                            leading: Icon(Icons.edit_outlined),
-                            title: Text('แก้ไขข้อมูลส่วนตัว'),
-                          ),
-                        ),
-                      if (!isCurrentUser) ...[
-                        PopupMenuItem<String>(
-                          value: 'edit_profile',
-                          child: ListTile(
-                            leading: Icon(Icons.edit_outlined),
-                            title: Text(
-                                'แก้ไขข้อมูลส่วนตัว'), // This dialog is for changing nickname, should be replaced with a proper edit screen later
-                          ),
-                        ),
-                        const PopupMenuItem<String>(
-                          value: 'change_role',
-                          child: ListTile(
-                            leading: Icon(
-                              Icons.admin_panel_settings_outlined,
-                            ),
-                            title: Text('เปลี่ยนบทบาท'),
-                          ),
-                        ),
-                        PopupMenuItem<String>(
-                          value: 'toggle_status',
-                          child: ListTile(
-                            leading: Icon(isActive
-                                ? Icons.toggle_off_outlined
-                                : Icons.toggle_on_outlined),
-                            title: Text(
-                                isActive ? 'ระงับการใช้งาน' : 'เปิดใช้งาน'),
-                          ),
-                        ),
-                      ] else ...[
-                        // This block is only for the currently logged-in user (isCurrentUser is true)
-                        const PopupMenuItem<String>(
-                          value: 'change_pin',
-                          child: ListTile(
-                            leading: Icon(Icons.pin_outlined),
-                            title: Text('เปลี่ยนรหัส PIN'),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              );
-            },
-          );
-        },
+                );
+              },
+            ),
+          ),
+        ],
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {

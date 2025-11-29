@@ -238,23 +238,50 @@ class _AdminHomeScreenState extends ConsumerState<AdminHomeScreen> {
     AsyncValue<List<Transaction>> transactionsAsync,
     AsyncValue<List<Account>> accountsAsync,
     AsyncValue<List<User>> membersAsync,
+  ) =>
+      Consumer(
+        builder: (context, ref, child) {
+          // Combine multiple async values into one.
+          final combinedAsync = (
+            transactions: ref.watch(transactionsProvider),
+            accounts: ref.watch(allAccountsProvider),
+            members: ref.watch(membersProvider),
+          );
+
+          return switch (combinedAsync) {
+            // Loading state
+            (transactions: AsyncLoading(), accounts: _, members: _) ||
+            (transactions: _, accounts: AsyncLoading(), members: _) ||
+            (transactions: _, accounts: _, members: AsyncLoading()) =>
+              const Center(child: CircularProgressIndicator()),
+
+            // Error state
+            (transactions: AsyncError(:final error), accounts: _, members: _) ||
+            (transactions: _, accounts: AsyncError(:final error), members: _) ||
+            (transactions: _, accounts: _, members: AsyncError(:final error)) =>
+              Center(child: Text('เกิดข้อผิดพลาด: $error')),
+
+            // Data state
+            (
+              transactions: AsyncData(value: final transactions),
+              accounts: AsyncData(value: final accounts),
+              members: AsyncData(value: final members)
+            ) =>
+              _buildTransactionListView(
+                  context, transactions, accounts, members),
+
+            // Default case (should not happen)
+            _ => const Center(child: Text('สถานะไม่ถูกต้อง')),
+          };
+        },
+      );
+
+  Widget _buildTransactionListView(
+    BuildContext context,
+    List<Transaction> transactions,
+    List<Account> accounts,
+    List<User> members,
   ) {
-    if (transactionsAsync.isLoading ||
-        accountsAsync.isLoading ||
-        membersAsync.isLoading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
-    if (transactionsAsync.hasError ||
-        accountsAsync.hasError ||
-        membersAsync.hasError) {
-      return const Center(child: Text('เกิดข้อผิดพลาดในการโหลดข้อมูล'));
-    }
-
-    final transactions = transactionsAsync.requireValue;
-    final accounts = accountsAsync.requireValue;
-    final members = membersAsync.requireValue;
-
     if (transactions.isEmpty) {
       return const Center(
         child: Padding(
@@ -276,7 +303,7 @@ class _AdminHomeScreenState extends ConsumerState<AdminHomeScreen> {
         : transactions;
 
     return ListView.builder(
-      controller: _scrollController,
+      controller: _scrollController, // Ensure controller is passed here
       itemCount: limitedTransactions.length,
       itemBuilder: (context, index) {
         final transaction = limitedTransactions[index];
@@ -284,8 +311,6 @@ class _AdminHomeScreenState extends ConsumerState<AdminHomeScreen> {
         final isIncome = transaction.type == 'income';
         final amountColor =
             isIncome ? Colors.green.shade700 : Colors.red.shade700;
-        final ownerId = account?.ownerUserId;
-        final creatorId = transaction.createdByUserId;
 
         return Card(
           margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),

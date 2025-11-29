@@ -13,6 +13,9 @@ import 'package:templefunds/features/home/screens/master_home_screen.dart';
 import 'package:templefunds/features/home/screens/member_home_screen.dart';
 import 'package:templefunds/features/settings/providers/settings_provider.dart';
 
+// A global key for the navigator, allowing access from anywhere in the app.
+final navigatorKey = GlobalKey<NavigatorState>();
+
 void main() async {
   // Ensure that widgets are initialized before running the app.
   WidgetsFlutterBinding.ensureInitialized();
@@ -46,6 +49,7 @@ class MyApp extends ConsumerWidget {
     }
 
     return MaterialApp(
+      navigatorKey: navigatorKey, // Assign the global key to the MaterialApp
       title: 'Temple Funds Management',
       theme: AppTheme.getTheme(getSeedColor(themeColorName)),
       // Add localization support for month_year_picker and general date formatting

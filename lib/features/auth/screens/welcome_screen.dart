@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:io';
 import 'package:flutter/services.dart';
+import 'package:templefunds/features/recovery/providers/recovery_codes_provider.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 import 'package:sqflite/sqflite.dart';
@@ -116,6 +117,7 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
       ref.invalidate(membersProvider);
       ref.invalidate(transactionsProvider);
       ref.invalidate(allAccountsProvider);
+      ref.invalidate(recoveryCodesProvider);
 
       // After resetting, we should also check the DB status again to update the UI
       await _checkDbStatus();
@@ -133,21 +135,6 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Listen for errors from the provider and show a SnackBar
-    ref.listen<AuthState>(authProvider, (previous, next) {
-      if (next.errorMessage != null) {
-        showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (_) => LoginErrorDialog(
-            errorMessage: next.errorMessage!,
-            lockoutUntil: next.lockoutUntil,
-          ),
-        );
-        // Clear the error so it doesn't show again on rebuild
-        ref.read(authProvider.notifier).clearError();
-      }
-    });
     final templeNameAsync = ref.watch(templeNameProvider);
     final homeStyleAsync = ref.watch(homeStyleProvider);
 

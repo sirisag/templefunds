@@ -85,6 +85,18 @@ class DatabaseHelper {
     ''');
 
     batch.execute('''
+      CREATE TABLE recovery_codes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        code TEXT NOT NULL UNIQUE,
+        is_used INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL,
+        is_tagged INTEGER NOT NULL DEFAULT 0,
+        used_at TEXT,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      )
+    ''');
+    batch.execute('''
       CREATE TABLE accounts (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
@@ -163,6 +175,7 @@ class DatabaseHelper {
         'users',
         'accounts',
         'transactions',
+        'recovery_codes',
         'app_metadata'
       };
       final tablesResult = await db
@@ -411,6 +424,79 @@ class DatabaseHelper {
       where: 'id = ?',
       whereArgs: [id],
     );
+  }
+
+  // --- CRUD Methods for 'recovery_codes' table ---
+
+  /// Fetches all recovery codes for a specific user.
+  Future<List<Map<String, dynamic>>> getRecoveryCodesForUser(int userId) async {
+    final db = await instance.database;
+    return await db.query('recovery_codes',
+        where: 'user_id = ?', whereArgs: [userId], orderBy: 'created_at DESC');
+  }
+
+  /// Adds a new recovery code to the database.
+  Future<void> addRecoveryCode(
+      int userId, String code, DateTime createdAt) async {
+    final db = await instance.database;
+    await db.insert('recovery_codes', {
+      'user_id': userId,
+      'code': code,
+      'is_used': 0,
+      'created_at': createdAt.toIso8601String(),
+    });
+  }
+
+  /// Finds a specific, unused recovery code for a user.
+  Future<Map<String, dynamic>?> findUnusedRecoveryCode(
+      int userId, String code) async {
+    final db = await instance.database;
+    final result = await db.query('recovery_codes',
+        where: 'user_id = ? AND code = ? AND is_used = 0',
+        whereArgs: [userId, code],
+        limit: 1);
+    return result.isNotEmpty ? result.first : null;
+  }
+
+  /// Marks a recovery code as used.
+  Future<void> markRecoveryCodeAsUsed(int codeId) async {
+    final db = await instance.database;
+    await db.update('recovery_codes',
+        {'is_used': 1, 'used_at': DateTime.now().toIso8601String()},
+        where: 'id = ?', whereArgs: [codeId]);
+  }
+
+  /// Toggles the 'is_tagged' status of a specific recovery code.
+  Future<void> toggleRecoveryCodeTag(int codeId, bool isCurrentlyTagged) async {
+    final db = await instance.database;
+    await db.update(
+      'recovery_codes',
+      {'is_tagged': isCurrentlyTagged ? 0 : 1},
+      where: 'id = ?',
+      whereArgs: [codeId],
+    );
+  }
+
+  /// Marks all unused recovery codes for a user as used.
+  /// This is useful when generating a completely new set of codes.
+  Future<void> invalidateAllUnusedRecoveryCodes(int userId) async {
+    final db = await instance.database;
+    await db.update(
+      'recovery_codes',
+      {'is_used': 1, 'used_at': DateTime.now().toIso8601String()},
+      where: 'user_id = ? AND is_used = 0',
+      whereArgs: [userId],
+    );
+  }
+
+  /// Deletes specific recovery codes by their IDs.
+  /// Used to trim excess codes.
+  Future<void> deleteRecoveryCodes(List<int> codeIds) async {
+    if (codeIds.isEmpty) return;
+    final db = await instance.database;
+    final args = List.filled(codeIds.length, '?').join(',');
+    await db.delete('recovery_codes',
+        where: 'id IN ($args)', whereArgs: codeIds);
   }
 
   // --- CRUD Methods for 'transactions' table ---
