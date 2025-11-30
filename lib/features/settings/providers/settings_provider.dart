@@ -107,6 +107,31 @@ final settingsProvider =
   return SettingsNotifier();
 });
 
+// --- Biometric Settings Provider ---
+
+class BiometricSettingsNotifier extends AsyncNotifier<bool> {
+  static const _biometricEnabledKey = 'biometric_enabled';
+
+  @override
+  Future<bool> build() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_biometricEnabledKey) ?? false;
+  }
+
+  Future<void> setBiometricEnabled(bool isEnabled) async {
+    final prefs = await SharedPreferences.getInstance();
+    state = const AsyncValue.loading();
+    state = await AsyncValue.guard(() async {
+      await prefs.setBool(_biometricEnabledKey, isEnabled);
+      return isEnabled;
+    });
+  }
+}
+
+final biometricSettingsProvider =
+    AsyncNotifierProvider<BiometricSettingsNotifier, bool>(() {
+  return BiometricSettingsNotifier();
+});
 // --- Local Device Customization Providers ---
 
 @immutable

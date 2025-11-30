@@ -46,6 +46,7 @@ dependencies:
 
   # Secure Storage for PIN
   flutter_secure_storage: ^9.2.4
+  local_auth: ^2.2.0
 
   # Hashing for PIN
   crypto: ^3.0.7

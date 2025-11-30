@@ -6,6 +6,7 @@ import 'package:templefunds/core/widgets/navigation_tile.dart';
 import 'package:templefunds/core/widgets/scroll_indicator_wrapper.dart';
 import 'package:templefunds/features/home/widgets/home_image_customizer.dart';
 import 'package:templefunds/features/members/screens/change_pin_screen.dart';
+import 'package:templefunds/features/settings/screens/security_settings_screen.dart';
 import 'package:templefunds/features/settings/widgets/theme_color_picker.dart';
 
 class PersonalSettingsScreen extends ConsumerStatefulWidget {
@@ -41,6 +42,16 @@ class _PersonalSettingsScreenState
                   Navigator.of(context).push(
                     MaterialPageRoute(builder: (_) => const ChangePinScreen()),
                   );
+                },
+              ),
+              const SizedBox(height: 4),
+              NavigationTile(
+                icon: Icons.fingerprint,
+                title: 'ความปลอดภัย',
+                subtitle: 'ตั้งค่าการเข้าสู่ระบบด้วยลายนิ้วมือ',
+                onTap: () {
+                  Navigator.of(context).push(MaterialPageRoute(
+                      builder: (_) => const SecuritySettingsScreen()));
                 },
               ),
               const SizedBox(height: 24),

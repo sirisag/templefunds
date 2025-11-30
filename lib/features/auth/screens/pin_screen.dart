@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:local_auth/local_auth.dart';
 import 'package:templefunds/core/models/user_model.dart';
 import 'package:templefunds/features/home/screens/admin_home_screen.dart';
 import 'package:templefunds/features/home/screens/master_home_screen.dart';
@@ -33,10 +34,38 @@ class _PinScreenState extends ConsumerState<PinScreen> {
   @override
   void initState() {
     super.initState();
-    // Check initial lockout state when the screen is first built.
     final initialLockout = ref.read(authProvider).lockoutUntil;
     if (initialLockout != null) {
       _updateRemainingTime(initialLockout);
+    }
+    // Attempt biometric auth automatically when the screen loads
+    _authenticateWithBiometrics(isAutoTrigger: true);
+  }
+
+  Future<void> _authenticateWithBiometrics({bool isAutoTrigger = false}) async {
+    final isBiometricEnabled =
+        ref.read(biometricSettingsProvider).asData?.value ?? false;
+    if (!isBiometricEnabled) return;
+
+    final LocalAuthentication auth = LocalAuthentication();
+    final bool canCheckBiometrics = await auth.canCheckBiometrics;
+    if (!canCheckBiometrics || !mounted) return;
+
+    try {
+      final bool didAuthenticate = await auth.authenticate(
+        localizedReason: 'กรุณายืนยันตัวตนเพื่อเข้าสู่ระบบ',
+        options: const AuthenticationOptions(
+          stickyAuth: true, // Keep the dialog open on failure
+          biometricOnly: true, // Only allow biometrics, no device PIN fallback
+        ),
+      );
+
+      if (didAuthenticate) {
+        _navigateToHomeScreen();
+      }
+    } on PlatformException catch (e) {
+      // Handle errors, e.g., user has not set up biometrics.
+      debugPrint('Biometric authentication error: $e');
     }
   }
 
@@ -289,20 +318,37 @@ class _PinScreenState extends ConsumerState<PinScreen> {
                       style: ElevatedButton.styleFrom(
                           disabledBackgroundColor: Colors.grey.shade300),
                     ),
-                  if (!_isLoading && !isLocked)
-                    ElevatedButton(
-                      onPressed: () => _submit(isSetupMode),
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 40,
-                          vertical: 16,
+                  if (!_isLoading && !isLocked) ...[
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        if (!isSetupMode)
+                          IconButton(
+                            icon: const Icon(Icons.fingerprint),
+                            iconSize: 40,
+                            tooltip: 'ใช้ลายนิ้วมือ',
+                            onPressed: () => _authenticateWithBiometrics(
+                                isAutoTrigger: false),
+                          ),
+                        const SizedBox(width: 8),
+                        ElevatedButton(
+                          onPressed: () => _submit(isSetupMode),
+                          style: ElevatedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 40,
+                              vertical: 16,
+                            ),
+                            textStyle: Theme.of(context).textTheme.titleMedium,
+                          ),
+                          child: Text(
+                            isSetupMode
+                                ? 'ยืนยันและเข้าสู่ระบบ'
+                                : 'เข้าสู่ระบบ',
+                          ),
                         ),
-                        textStyle: Theme.of(context).textTheme.titleMedium,
-                      ),
-                      child: Text(
-                        isSetupMode ? 'ยืนยันและเข้าสู่ระบบ' : 'เข้าสู่ระบบ',
-                      ),
+                      ],
                     ),
+                  ]
                 ],
               ),
             ),
