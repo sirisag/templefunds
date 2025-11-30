@@ -34,22 +34,26 @@ class AuthState {
   final AuthStatus status;
   final User? user; // The user object when logged in or partially identified
   final DateTime? lastDbExport;
+  final DateTime? lockoutUntil; // New: To track lockout time across the app
 
   AuthState({
     this.status = AuthStatus.initializing,
     this.user,
     this.lastDbExport,
+    this.lockoutUntil,
   });
 
   AuthState copyWith({
     AuthStatus? status,
     User? user,
     DateTime? lastDbExport,
+    DateTime? lockoutUntil,
   }) {
     return AuthState(
       status: status ?? this.status,
       user: user ?? this.user, // Allow clearing the error message
       lastDbExport: lastDbExport ?? this.lastDbExport,
+      lockoutUntil: lockoutUntil ?? this.lockoutUntil,
     );
   }
 }
@@ -71,8 +75,11 @@ class AuthNotifier extends Notifier<AuthState> {
   Future<void> _init() async {
     debugPrint("[Auth] Initializing authentication state...");
     // Check for an existing lockout on app start
-    if (await _isCurrentlyLockedOut()) {
+    final lockoutTime = await _secureStorage.getLockoutEndTime();
+    if (lockoutTime != null && lockoutTime.isAfter(DateTime.now())) {
       debugPrint("[Auth] User is currently locked out. Initialization halted.");
+      // Set the lockout time in the state so the UI can react.
+      state = state.copyWith(lockoutUntil: lockoutTime);
       return;
     }
 
@@ -116,10 +123,9 @@ class AuthNotifier extends Notifier<AuthState> {
 
         if (dbExists) {
           // DB exists, but no user logged in here. Go to the generic login screen.
-          // FIX: Change the state to loggedOut to show the WelcomeScreen first,
-          // instead of forcing the LoginScreen. The user can then choose to log in.
           debugPrint(
               "[Auth] DB exists, but no user saved. Setting state to loggedOut.");
+          // Set to loggedOut to show the WelcomeScreen first.
           state = state.copyWith(
               status: AuthStatus.loggedOut, lastDbExport: lastDbExport);
         } else {
@@ -143,10 +149,9 @@ class AuthNotifier extends Notifier<AuthState> {
   /// Returns true if locked out, false otherwise.
   Future<bool> _isCurrentlyLockedOut() async {
     final lockoutTime = await _secureStorage.getLockoutEndTime();
-    if (lockoutTime != null && lockoutTime.isAfter(DateTime.now())) {
-      state = state.copyWith(
-        status: state.status,
-      );
+    final isLocked = lockoutTime != null && lockoutTime.isAfter(DateTime.now());
+    if (isLocked) {
+      state = state.copyWith(lockoutUntil: lockoutTime);
       return true;
     }
     return false;
@@ -161,12 +166,17 @@ class AuthNotifier extends Notifier<AuthState> {
     String errorMessage;
     DateTime? lockoutEndTime;
     if (newFailureCount >= lockoutThreshold) {
-      // Lockout duration increases by 1 minute for each failure after the 2nd.
-      final lockoutMinutes = newFailureCount - (lockoutThreshold - 1);
+      // New: Exponential backoff for lockout duration.
+      // It starts at 15 seconds and doubles with each subsequent failure.
+      // The number of lockouts that have occurred is `newFailureCount - lockoutThreshold`.
+      final lockoutCount = newFailureCount - lockoutThreshold;
+      final baseLockoutSeconds = 15;
+      final lockoutSeconds = baseLockoutSeconds * pow(2, lockoutCount);
       lockoutEndTime = DateTime.now().add(
-        Duration(minutes: lockoutMinutes),
+        Duration(seconds: lockoutSeconds.toInt()),
       );
       await _secureStorage.setLockoutEndTime(lockoutEndTime);
+      state = state.copyWith(lockoutUntil: lockoutEndTime); // Update state
       errorMessage = '$baseErrorMessage และถูกล็อกชั่วคราว';
     } else {
       errorMessage = baseErrorMessage;
@@ -179,6 +189,7 @@ class AuthNotifier extends Notifier<AuthState> {
     if (state.user?.id == null) return; // Should not happen, but good practice
     await _secureStorage.resetLoginFailureCount(); // Reset on successful setup
     await _secureStorage.savePin(pin);
+    state = state.copyWith(lockoutUntil: null); // Clear lockout on success
     await _secureStorage.saveLastUserId(state.user!.id!);
     state = state.copyWith(
       status: AuthStatus.loggedIn,
@@ -194,6 +205,7 @@ class AuthNotifier extends Notifier<AuthState> {
     final isPinCorrect = await _secureStorage.verifyPin(pin);
     if (isPinCorrect) {
       await _secureStorage.resetLoginFailureCount();
+      state = state.copyWith(lockoutUntil: null); // Clear lockout on success
       state = state.copyWith(
         status: AuthStatus.loggedIn,
       );
@@ -227,6 +239,7 @@ class AuthNotifier extends Notifier<AuthState> {
 
       // Credentials are correct
       await _secureStorage.resetLoginFailureCount();
+      state = state.copyWith(lockoutUntil: null); // Clear lockout on success
       state = state.copyWith(
         status: AuthStatus.requiresPinSetup,
         user: user,
@@ -261,6 +274,7 @@ class AuthNotifier extends Notifier<AuthState> {
 
       // Credentials are correct
       await _secureStorage.resetLoginFailureCount();
+      state = state.copyWith(lockoutUntil: null); // Clear lockout on success
 
       // Mark the code as used
       await _dbHelper.markRecoveryCodeAsUsed(foundCode['id'] as int);
@@ -541,7 +555,7 @@ class AuthNotifier extends Notifier<AuthState> {
     await _secureStorage.deleteAll();
     await _dbHelper.deleteDatabaseFile();
     state = AuthState(
-      status: AuthStatus.loggedOut,
+      status: AuthStatus.loggedOut, // Reset to a clean loggedOut state
     ); // Reset to a clean loggedOut state
   }
 
@@ -552,13 +566,12 @@ class AuthNotifier extends Notifier<AuthState> {
   }
 
   Future<void> logout() async {
-    // FIX: Use `deleteAuthCredentials` to only remove PIN and user ID,
+    // Use `deleteAuthCredentials` to only remove PIN and user ID,
     // preserving other settings like logo size which are also in secure storage.
     await _secureStorage.deleteAuthCredentials();
-    // After deleting credentials, simply reset the state to loggedOut.
-    // The AuthWrapper will then show the appropriate screen (WelcomeScreen or LoginScreen)
-    // on the next app start, which is the correct behavior.
-    state = AuthState(status: AuthStatus.loggedOut);
+    // After deleting credentials, reset the state to loggedOut and clear user/lockout info.
+    state =
+        AuthState(status: AuthStatus.loggedOut, user: null, lockoutUntil: null);
   }
 }
 

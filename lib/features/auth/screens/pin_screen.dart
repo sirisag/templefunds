@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -26,6 +27,39 @@ class _PinScreenState extends ConsumerState<PinScreen> {
   final _formKey = GlobalKey<FormState>();
   bool _isLoading = false;
   bool _isPinVisible = false;
+  Timer? _timer;
+  Duration _remainingTime = Duration.zero;
+
+  @override
+  void initState() {
+    super.initState();
+    // Check initial lockout state when the screen is first built.
+    final initialLockout = ref.read(authProvider).lockoutUntil;
+    if (initialLockout != null) {
+      _updateRemainingTime(initialLockout);
+    }
+  }
+
+  void _updateRemainingTime(DateTime lockoutUntil) {
+    if (!mounted) return;
+    setState(() {
+      _remainingTime = lockoutUntil.difference(DateTime.now());
+      if (_remainingTime.isNegative) _remainingTime = Duration.zero;
+    });
+    _startTimer();
+  }
+
+  void _startTimer() {
+    _timer?.cancel(); // Cancel any existing timer.
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (_remainingTime.inSeconds > 0) {
+        setState(() => _remainingTime -= const Duration(seconds: 1));
+      } else {
+        _timer?.cancel();
+        setState(() {}); // Force rebuild to re-enable the button.
+      }
+    });
+  }
 
   @override
   void dispose() {
@@ -33,6 +67,7 @@ class _PinScreenState extends ConsumerState<PinScreen> {
     _confirmPinController.dispose();
     _pinFocusNode.dispose();
     _confirmPinFocusNode.dispose();
+    _timer?.cancel();
     super.dispose();
   }
 
@@ -77,10 +112,10 @@ class _PinScreenState extends ConsumerState<PinScreen> {
           final (errorMessage, lockoutUntil) = result;
           // Failure: Show dialog first
           await showDialog(
-            context: context,
-            builder: (_) => LoginErrorDialog(
-                errorMessage: errorMessage, lockoutUntil: lockoutUntil),
-          );
+              context: context,
+              builder: (_) => LoginErrorDialog(errorMessage: errorMessage));
+          // After dialog, if there's a lockout, update the timer.
+          if (lockoutUntil != null) _updateRemainingTime(lockoutUntil);
         }
       }
     }
@@ -114,6 +149,14 @@ class _PinScreenState extends ConsumerState<PinScreen> {
     final isSetupMode = authState.status == AuthStatus.requiresPinSetup;
     final canPop = Navigator.of(context).canPop();
     final homeStyleAsync = ref.watch(homeStyleProvider);
+
+    // Listen to changes in the lockout state from the provider.
+    ref.listen(authProvider.select((s) => s.lockoutUntil), (_, next) {
+      if (next != null) {
+        _updateRemainingTime(next);
+      }
+    });
+    final isLocked = _remainingTime.inSeconds > 0;
 
     return Scaffold(
       appBar: AppBar(
@@ -236,9 +279,17 @@ class _PinScreenState extends ConsumerState<PinScreen> {
                       label: Text(_isPinVisible ? 'ซ่อนรหัส' : 'แสดงรหัส'),
                     ),
                   ),
-                  if (_isLoading)
-                    const CircularProgressIndicator()
-                  else
+                  if (_isLoading) const CircularProgressIndicator(),
+                  if (!_isLoading && isLocked)
+                    ElevatedButton.icon(
+                      onPressed: null, // Disabled
+                      icon: const Icon(Icons.timer_outlined),
+                      label: Text(
+                          'กรุณารอ ${_remainingTime.inMinutes}:${(_remainingTime.inSeconds % 60).toString().padLeft(2, '0')}'),
+                      style: ElevatedButton.styleFrom(
+                          disabledBackgroundColor: Colors.grey.shade300),
+                    ),
+                  if (!_isLoading && !isLocked)
                     ElevatedButton(
                       onPressed: () => _submit(isSetupMode),
                       style: ElevatedButton.styleFrom(

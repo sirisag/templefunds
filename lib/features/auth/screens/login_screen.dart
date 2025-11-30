@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -20,11 +21,45 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _id1Controller = TextEditingController();
   final _id2Controller = TextEditingController();
   bool _isLoading = false;
+  Timer? _timer;
+  Duration _remainingTime = Duration.zero;
+
+  @override
+  void initState() {
+    super.initState();
+    // Check initial lockout state when the screen is first built.
+    final initialLockout = ref.read(authProvider).lockoutUntil;
+    if (initialLockout != null) {
+      _updateRemainingTime(initialLockout);
+    }
+  }
+
+  void _updateRemainingTime(DateTime lockoutUntil) {
+    if (!mounted) return;
+    setState(() {
+      _remainingTime = lockoutUntil.difference(DateTime.now());
+      if (_remainingTime.isNegative) _remainingTime = Duration.zero;
+    });
+    _startTimer();
+  }
+
+  void _startTimer() {
+    _timer?.cancel(); // Cancel any existing timer.
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (_remainingTime.inSeconds > 0) {
+        setState(() => _remainingTime -= const Duration(seconds: 1));
+      } else {
+        _timer?.cancel();
+        setState(() {}); // Force rebuild to re-enable the button.
+      }
+    });
+  }
 
   @override
   void dispose() {
     _id1Controller.dispose();
     _id2Controller.dispose();
+    _timer?.cancel();
     super.dispose();
   }
 
@@ -50,14 +85,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         );
       } else {
         final (errorMessage, lockoutUntil) = result;
-        // Failure: Show dialog first, then update UI
+        // Failure: Show dialog first
         await showDialog(
           context: context,
           builder: (_) => LoginErrorDialog(
             errorMessage: errorMessage,
-            lockoutUntil: lockoutUntil,
           ),
         );
+        // After dialog, if there's a lockout, update the timer.
+        if (lockoutUntil != null) _updateRemainingTime(lockoutUntil);
         setState(() => _isLoading = false);
       }
     }
@@ -66,6 +102,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final homeStyleAsync = ref.watch(homeStyleProvider);
+    // Listen to changes in the lockout state from the provider.
+    ref.listen(authProvider.select((s) => s.lockoutUntil), (_, next) {
+      if (next != null) {
+        _updateRemainingTime(next);
+      }
+    });
+
+    final isLocked = _remainingTime.inSeconds > 0;
 
     return Scaffold(
       appBar: AppBar(
@@ -159,13 +203,23 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   },
                 ),
                 const SizedBox(height: 24),
-                _isLoading
-                    ? const Center(child: CircularProgressIndicator())
-                    : ElevatedButton.icon(
-                        onPressed: _submit,
-                        icon: const Icon(Icons.login),
-                        label: const Text('เข้าสู่ระบบ'),
-                      ),
+                if (_isLoading)
+                  const Center(child: CircularProgressIndicator())
+                else if (isLocked)
+                  ElevatedButton.icon(
+                    onPressed: null, // Disabled
+                    icon: const Icon(Icons.timer_outlined),
+                    label: Text(
+                        'กรุณารอ ${_remainingTime.inMinutes}:${(_remainingTime.inSeconds % 60).toString().padLeft(2, '0')}'),
+                    style: ElevatedButton.styleFrom(
+                        disabledBackgroundColor: Colors.grey.shade300),
+                  )
+                else
+                  ElevatedButton.icon(
+                    onPressed: _submit,
+                    icon: const Icon(Icons.login),
+                    label: const Text('เข้าสู่ระบบ'),
+                  ),
                 const SizedBox(height: 16),
                 TextButton(
                   onPressed: () {
