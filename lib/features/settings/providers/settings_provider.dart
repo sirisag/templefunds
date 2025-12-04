@@ -215,3 +215,67 @@ final homeStyleProvider =
     AsyncNotifierProvider<HomeStyleNotifier, HomeStyleState>(() {
   return HomeStyleNotifier();
 });
+
+// --- Background Image Provider ---
+
+@immutable
+class BackgroundStyleState {
+  final String? imagePath;
+
+  const BackgroundStyleState({this.imagePath});
+}
+
+class BackgroundStyleNotifier extends AsyncNotifier<BackgroundStyleState> {
+  static const _pathKey = 'background_style_image_path';
+
+  @override
+  Future<BackgroundStyleState> build() async {
+    final prefs = await SharedPreferences.getInstance();
+    return BackgroundStyleState(imagePath: prefs.getString(_pathKey));
+  }
+
+  Future<void> updateBackgroundImage(File imageFile) async {
+    final appDocsDir = await getApplicationDocumentsDirectory();
+    final newImagePath = p.join(appDocsDir.path, 'app_background_image.png');
+    await imageFile.copy(newImagePath);
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_pathKey, newImagePath);
+
+    state = AsyncValue.data(BackgroundStyleState(imagePath: newImagePath));
+  }
+
+  Future<void> removeBackgroundImage() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_pathKey);
+    state = const AsyncValue.data(BackgroundStyleState(imagePath: null));
+  }
+}
+
+final backgroundStyleProvider =
+    AsyncNotifierProvider<BackgroundStyleNotifier, BackgroundStyleState>(() {
+  return BackgroundStyleNotifier();
+});
+
+// --- Font Scale Provider ---
+
+class FontScaleNotifier extends AsyncNotifier<double> {
+  static const _fontScaleKey = 'app_font_scale';
+
+  @override
+  Future<double> build() async {
+    final prefs = await SharedPreferences.getInstance();
+    // Default scale is 1.0
+    return prefs.getDouble(_fontScaleKey) ?? 1.0;
+  }
+
+  Future<void> updateFontScale(double newScale) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble(_fontScaleKey, newScale);
+    state = AsyncValue.data(newScale);
+  }
+}
+
+final fontScaleProvider = AsyncNotifierProvider<FontScaleNotifier, double>(() {
+  return FontScaleNotifier();
+});

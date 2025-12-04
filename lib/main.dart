@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -30,6 +31,8 @@ class MyApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final themeColorName = ref.watch(themeSeedColorProvider).asData?.value;
+    final backgroundStyle = ref.watch(backgroundStyleProvider);
+    final fontScale = ref.watch(fontScaleProvider).asData?.value ?? 1.0;
 
     Color getSeedColor(String? colorName) {
       switch (colorName) {
@@ -51,7 +54,7 @@ class MyApp extends ConsumerWidget {
     return MaterialApp(
       navigatorKey: navigatorKey, // Assign the global key to the MaterialApp
       title: 'Temple Funds Management',
-      theme: AppTheme.getTheme(getSeedColor(themeColorName)),
+      theme: AppTheme.getTheme(getSeedColor(themeColorName), fontScale),
       // Add localization support for month_year_picker and general date formatting
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
@@ -62,6 +65,39 @@ class MyApp extends ConsumerWidget {
         Locale('th'), // Your primary locale
       ],
       locale: const Locale('th', 'TH'),
+      builder: (context, child) {
+        // Wrap the entire app with a Stack to add a background image.
+        return Stack(
+          children: [
+            // Background Image
+            backgroundStyle.when(
+              data: (style) {
+                final imageFile =
+                    style.imagePath != null ? File(style.imagePath!) : null;
+                if (imageFile != null && imageFile.existsSync()) {
+                  return Image.file(
+                    imageFile,
+                    fit: BoxFit.cover,
+                    height: double.infinity,
+                    width: double.infinity,
+                  );
+                }
+                // Fallback to default asset
+                return Image.asset('assets/images/bg.png',
+                    fit: BoxFit.cover,
+                    height: double.infinity,
+                    width: double.infinity);
+              },
+              loading: () => const SizedBox.shrink(), // Or a placeholder
+              error: (e, s) => Image.asset('assets/images/bg.png',
+                  fit: BoxFit.cover,
+                  height: double.infinity,
+                  width: double.infinity),
+            ), // The rest of the app
+            if (child != null) child,
+          ],
+        );
+      },
       home: const AuthWrapper(),
     );
   }
