@@ -127,6 +127,7 @@ class AdminControlPanel extends ConsumerWidget {
                     ),
                     label: const Text('ทำธุรกรรม'),
                     style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.white.withOpacity(0.6),
                       padding: const EdgeInsets.symmetric(
                           horizontal: 12, vertical: 12),
                     ),

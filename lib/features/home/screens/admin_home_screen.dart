@@ -5,9 +5,12 @@ import 'package:intl/intl.dart';
 import 'package:templefunds/core/utils/date_formatter.dart';
 import 'package:templefunds/core/models/account_model.dart';
 import 'package:templefunds/core/models/transaction_model.dart';
+import 'package:templefunds/features/settings/providers/settings_provider.dart';
 import 'package:templefunds/core/models/user_model.dart';
 import 'package:templefunds/core/widgets/app_dialogs.dart';
+import 'package:templefunds/core/services/notification_service.dart';
 import 'package:templefunds/core/widgets/navigation_tile.dart';
+import 'package:templefunds/features/manual/screens/manual_main_screen.dart';
 import 'package:templefunds/features/auth/providers/auth_provider.dart';
 import 'package:templefunds/core/services/db_export_service.dart';
 import 'package:templefunds/features/members/providers/members_provider.dart';
@@ -32,9 +35,42 @@ class _AdminHomeScreenState extends ConsumerState<AdminHomeScreen> {
   final ScrollController _scrollController = ScrollController();
 
   @override
+  void initState() {
+    super.initState();
+    // ทำการตรวจสอบการแจ้งเตือนหลังจากที่ widget ถูกสร้างขึ้นแล้ว
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkAndShowBackupReminder();
+    });
+  }
+
+  @override
   void dispose() {
     _scrollController.dispose();
     super.dispose();
+  }
+
+  Future<void> _checkAndShowBackupReminder() async {
+    final reminderDays = await ref.read(backupReminderDaysProvider.future);
+    // After an await, check if the widget is still mounted before using ref again.
+    if (!mounted) return;
+
+    final lastExportDate = ref.read(authProvider).lastDbExport;
+    bool shouldRemind = false;
+
+    if (lastExportDate == null) {
+      shouldRemind = true; // ยังไม่เคยสำรองข้อมูลเลย
+    } else if (DateTime.now().difference(lastExportDate).inDays >
+        reminderDays) {
+      shouldRemind = true; // ไม่ได้สำรองข้อมูลนานเกินวันที่กำหนด
+    }
+
+    if (shouldRemind && mounted) {
+      final notificationService = ref.read(notificationServiceProvider);
+      await notificationService.init();
+      await notificationService.showBackupReminderNotification(
+        days: reminderDays,
+      );
+    }
   }
 
   // Helper method to show an export confirmation dialog
@@ -163,6 +199,14 @@ class _AdminHomeScreenState extends ConsumerState<AdminHomeScreen> {
           ],
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.help_outline),
+            tooltip: 'คู่มือการใช้งาน',
+            onPressed: () {
+              Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const ManualMainScreen()));
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.settings_outlined),
             tooltip: 'ตั้งค่า',

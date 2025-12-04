@@ -33,6 +33,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   bool _isLogoSaving = false;
   bool _isBgLoading = false;
   double? _currentFontScale;
+  double? _currentReminderDays;
 
   @override
   void initState() {
@@ -345,6 +346,45 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     ),
                   ),
                   const SizedBox(height: 24),
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                      child: Column(
+                        children: [
+                          const Text('แจ้งเตือนเมื่อไม่สำรองข้อมูล',
+                              style: TextStyle(
+                                  fontSize: 16, fontWeight: FontWeight.bold)),
+                          ref.watch(backupReminderDaysProvider).when(
+                                data: (days) {
+                                  return Slider(
+                                    value:
+                                        _currentReminderDays ?? days.toDouble(),
+                                    min: 1,
+                                    max: 30,
+                                    divisions: 29,
+                                    label:
+                                        'ทุกๆ ${(_currentReminderDays ?? days.toDouble()).round()} วัน',
+                                    onChanged: (value) {
+                                      setState(() {
+                                        _currentReminderDays = value;
+                                      });
+                                    },
+                                    onChangeEnd: (value) {
+                                      ref
+                                          .read(settingsProvider.notifier)
+                                          .updateBackupReminderDays(
+                                              value.round());
+                                    },
+                                  );
+                                },
+                                loading: () => const LinearProgressIndicator(),
+                                error: (e, s) =>
+                                    const Text('โหลดข้อมูลล้มเหลว'),
+                              ),
+                        ],
+                      ),
+                    ),
+                  ),
                   const ThemeColorPicker(),
                   const SizedBox(height: 24),
                   const Divider(),

@@ -7,6 +7,7 @@ import 'package:templefunds/core/widgets/scroll_indicator_wrapper.dart';
 import 'package:templefunds/core/widgets/app_dialogs.dart';
 import 'package:templefunds/core/widgets/navigation_tile.dart';
 import 'package:templefunds/features/auth/providers/auth_provider.dart';
+import 'package:templefunds/features/manual/screens/manual_main_screen.dart';
 import 'package:templefunds/features/transactions/providers/accounts_provider.dart';
 import 'package:templefunds/features/transactions/screens/audit_transactions_screen.dart';
 import 'package:templefunds/features/settings/screens/personal_settings_screen.dart';
@@ -51,6 +52,14 @@ class _MemberHomeScreenState extends ConsumerState<MemberHomeScreen> {
       appBar: AppBar(
         title: const Text('หน้าหลัก : พระ'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.help_outline),
+            tooltip: 'คู่มือการใช้งาน',
+            onPressed: () {
+              Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const ManualMainScreen()));
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.settings_outlined),
             tooltip: 'ตั้งค่า',

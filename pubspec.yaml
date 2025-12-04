@@ -79,6 +79,7 @@ dependencies:
   
   # For cropping and rotating images
   image_cropper: ^11.0.0
+  flutter_local_notifications: ^19.5.0
 
 dev_dependencies: 
   flutter_test:

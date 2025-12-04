@@ -173,7 +173,7 @@ class _ImageCustomizationControlsState
               icon: const Icon(Icons.image_search),
               label: const Text('เลือกรูปภาพใหม่'),
             ),
-            _buildSlider('ความโค้ง', _cornerRadius, 0, 100,
+            _buildSlider('ความโค้ง', _cornerRadius, 0, 200,
                 (v) => setState(() => _cornerRadius = v)),
             _buildSlider('ความกว้าง', _width, 0.2, 1.0,
                 (v) => setState(() => _width = v)),

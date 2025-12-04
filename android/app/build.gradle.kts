@@ -11,6 +11,8 @@ android {
     ndkVersion = "29.0.14206865"
 
     compileOptions {
+        // เปิดใช้งาน Core Library Desugaring
+        isCoreLibraryDesugaringEnabled = true
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
@@ -45,4 +47,5 @@ flutter {
 
 dependencies {
     implementation("com.google.android.play:core:1.10.3")
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 }

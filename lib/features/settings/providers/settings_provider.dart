@@ -33,6 +33,14 @@ final templeLogoProvider = FutureProvider<String?>((ref) async {
   return dbHelper.getAppMetadata('temple_logo_path');
 });
 
+/// A provider to fetch the backup reminder period in days.
+final backupReminderDaysProvider = FutureProvider<int>((ref) async {
+  final dbHelper = DatabaseHelper.instance;
+  final daysString = await dbHelper.getAppMetadata('backup_reminder_days');
+  // Default to 7 days if not set.
+  return int.tryParse(daysString ?? '7') ?? 7;
+});
+
 /// Notifier for handling settings updates.
 class SettingsNotifier extends Notifier<AsyncValue<void>> {
   late DatabaseHelper _dbHelper;
@@ -93,6 +101,18 @@ class SettingsNotifier extends Notifier<AsyncValue<void>> {
 
       await _dbHelper.setAppMetadata('temple_logo_path', newPath);
       ref.invalidate(templeLogoProvider); // Force refresh
+      state = const AsyncValue.data(null);
+    } catch (e) {
+      state = AsyncValue.error(e, StackTrace.current);
+      rethrow;
+    }
+  }
+
+  Future<void> updateBackupReminderDays(int days) async {
+    state = const AsyncValue.loading();
+    try {
+      await _dbHelper.setAppMetadata('backup_reminder_days', days.toString());
+      ref.invalidate(backupReminderDaysProvider); // Force refresh
       state = const AsyncValue.data(null);
     } catch (e) {
       state = AsyncValue.error(e, StackTrace.current);
