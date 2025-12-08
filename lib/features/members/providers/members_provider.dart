@@ -31,11 +31,8 @@ class MembersNotifier extends AsyncNotifier<List<User>> {
         name: 'ปัจจัยส่วนตัว ${user.nickname}',
         createdAt: DateTime.now(),
       );
-      // Use separate calls now that the initial DB creation race condition is solved.
-      // This needs to be a transaction to ensure both succeed or fail together.
-      final newUserId = await _dbHelper.addUser(user);
-      final accountWithOwner = newAccount.copyWith(ownerUserId: newUserId);
-      await _dbHelper.addAccount(accountWithOwner);
+      // Use the new transactional method to ensure data integrity.
+      await _dbHelper.addUserWithAccount(user, newAccount);
     }
     ref.invalidateSelf(); // Refresh the provider
     await future; // Wait for the refresh to complete

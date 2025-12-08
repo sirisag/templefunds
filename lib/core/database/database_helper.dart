@@ -289,6 +289,26 @@ class DatabaseHelper {
     });
   }
 
+  /// Adds a new user and their corresponding personal account within a single database transaction.
+  /// This ensures data integrity, as both operations will either succeed or fail together.
+  Future<void> addUserWithAccount(User user, Account account) async {
+    final db = await instance.database;
+    await db.transaction((txn) async {
+      // Insert the user and get their new ID.
+      final newUserId = await txn.insert(
+        'users',
+        user.toMap(),
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+
+      // Create a new account object with the owner ID set to the new user's ID.
+      final accountWithOwner = account.copyWith(ownerUserId: newUserId);
+
+      // Insert the account.
+      await txn.insert('accounts', accountWithOwner.toMap());
+    });
+  }
+
   // --- CRUD Methods for 'users' table ---
 
   /// Inserts a new user. If this is the first user (Admin during registration),

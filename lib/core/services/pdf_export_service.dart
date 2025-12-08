@@ -460,7 +460,7 @@ class PdfExportService {
     return pw.Align(
       alignment: pw.Alignment.centerRight,
       child: pw.Text(
-        'หน้า  / ',
+        'หน้า $pageNumber / $totalPages',
         style: const pw.TextStyle(color: PdfColors.grey),
       ),
     );

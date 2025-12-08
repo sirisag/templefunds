@@ -250,10 +250,12 @@ class _PinScreenState extends ConsumerState<PinScreen> {
                         ),
                       );
                     },
-                    loading: () => const CircleAvatar(
-                        radius: 80, child: CircularProgressIndicator()),
-                    error: (e, st) => const CircleAvatar(
-                        radius: 80, child: Icon(Icons.error)),
+                    loading: () => const SizedBox(
+                        height: 160,
+                        child: Center(child: CircularProgressIndicator())),
+                    error: (e, st) => const SizedBox(
+                        height: 160,
+                        child: Center(child: Icon(Icons.error, size: 80))),
                   ),
                   const SizedBox(height: 16),
                   Text(

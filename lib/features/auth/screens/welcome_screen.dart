@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:io';
+import 'package:flutter/foundation.dart'; // Import kDebugMode
 import 'package:templefunds/features/manual/screens/manual_main_screen.dart';
 import 'package:flutter/services.dart';
 import 'package:templefunds/features/recovery/providers/recovery_codes_provider.dart';
@@ -11,6 +12,7 @@ import '../widgets/login_error_dialog.dart';
 import '../../members/providers/members_provider.dart';
 import 'login_screen.dart';
 import 'temple_registration_screen.dart';
+import '../../../core/debug/database_seeder.dart';
 import '../../transactions/providers/accounts_provider.dart';
 import '../../settings/providers/settings_provider.dart';
 import '../../transactions/providers/transactions_provider.dart';
@@ -130,6 +132,47 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
             backgroundColor: Colors.orange,
           ),
         );
+      }
+    }
+  }
+
+  Future<void> _seedData() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('สร้างข้อมูลจำลอง'),
+        content: const Text(
+          'คำเตือน: การกระทำนี้จะลบข้อมูลทั้งหมดที่มีอยู่และแทนที่ด้วยข้อมูลจำลองชุดใหญ่สำหรับทดสอบ คุณแน่ใจหรือไม่?',
+        ),
+        actions: [
+          TextButton(
+            child: const Text('ยกเลิก'),
+            onPressed: () => Navigator.of(ctx).pop(false),
+          ),
+          TextButton(
+            style: TextButton.styleFrom(
+              foregroundColor: Theme.of(context).colorScheme.error,
+            ),
+            child: const Text('ยืนยัน'),
+            onPressed: () => Navigator.of(ctx).pop(true),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      setState(() => _isLoading = true);
+      try {
+        await ref.read(databaseSeederProvider).seedDatabase();
+        await _checkDbStatus(); // Refresh UI
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('สร้างข้อมูลจำลองสำเร็จ!'),
+            backgroundColor: Colors.green,
+          ));
+        }
+      } finally {
+        if (mounted) setState(() => _isLoading = false);
       }
     }
   }
@@ -291,6 +334,15 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
                         icon: const Icon(Icons.file_upload_outlined),
                         label: const Text('นำเข้าข้อมูล'),
                       ),
+                      // This button will only be visible in debug mode
+                      if (kDebugMode)
+                        TextButton.icon(
+                          onPressed: _seedData,
+                          icon: const Icon(Icons.data_exploration_outlined),
+                          label: const Text('ข้อมูลจำลอง'),
+                          style: TextButton.styleFrom(
+                              foregroundColor: Colors.purple),
+                        ),
                     ],
                   ),
                 ],

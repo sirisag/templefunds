@@ -114,11 +114,7 @@ class AuthWrapper extends ConsumerWidget {
     // and show the correct screen.
     switch (authState.status) {
       case AuthStatus.initializing:
-        return const Scaffold(
-          body: Center(
-            child: CircularProgressIndicator(),
-          ),
-        );
+        return const Center(child: CircularProgressIndicator());
       case AuthStatus.loggedIn:
         final user = authState.user;
         if (user?.role == UserRole.Admin) {
