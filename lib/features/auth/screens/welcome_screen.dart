@@ -139,10 +139,22 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
   Future<void> _seedData() async {
     final confirmed = await showDialog<bool>(
       context: context,
+      barrierDismissible: false,
       builder: (ctx) => AlertDialog(
-        title: const Text('สร้างข้อมูลจำลอง'),
-        content: const Text(
-          'คำเตือน: การกระทำนี้จะลบข้อมูลทั้งหมดที่มีอยู่และแทนที่ด้วยข้อมูลจำลองชุดใหญ่สำหรับทดสอบ คุณแน่ใจหรือไม่?',
+        title: const Text('โหมดทดลองใช้งาน'),
+        content: const Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+                'การกระทำนี้จะลบข้อมูลปัจจุบันทั้งหมดและสร้างข้อมูลจำลองเพื่อให้คุณได้ทดลองใช้งานฟังก์ชันต่างๆ ของแอป'),
+            SizedBox(height: 16),
+            Text(
+                'หลังจากสร้างข้อมูลเสร็จแล้ว ให้ใช้ข้อมูลด้านล่างเพื่อเข้าสู่ระบบ:',
+                style: TextStyle(fontWeight: FontWeight.bold)),
+            Text(' • รหัสประจำตัว (ID1): 9999'),
+            Text(' • รหัสยืนยัน (ID2): 1111'),
+          ],
         ),
         actions: [
           TextButton(
@@ -153,7 +165,7 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
             style: TextButton.styleFrom(
               foregroundColor: Theme.of(context).colorScheme.error,
             ),
-            child: const Text('ยืนยัน'),
+            child: const Text('ยืนยันและเริ่ม'),
             onPressed: () => Navigator.of(ctx).pop(true),
           ),
         ],
@@ -313,37 +325,31 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
                                       ),
                                     ],
                                   ),
+                            const SizedBox(height: 24),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                              children: [
+                                TextButton.icon(
+                                  onPressed: _resetApp,
+                                  icon:
+                                      const Icon(Icons.delete_forever_outlined),
+                                  label: const Text('เริ่มใหม่'),
+                                  style: TextButton.styleFrom(
+                                    foregroundColor:
+                                        Theme.of(context).colorScheme.error,
+                                  ),
+                                ),
+                                TextButton.icon(
+                                  onPressed: _importFile,
+                                  icon: const Icon(Icons.file_upload_outlined),
+                                  label: const Text('นำเข้าข้อมูล'),
+                                ),
+                              ],
+                            ),
                           ],
                         ),
                       ),
                     ),
-                  ),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      TextButton.icon(
-                        onPressed: _resetApp,
-                        icon: const Icon(Icons.delete_forever_outlined),
-                        label: const Text('เริ่มใหม่'),
-                        style: TextButton.styleFrom(
-                          foregroundColor: Theme.of(context).colorScheme.error,
-                        ),
-                      ),
-                      TextButton.icon(
-                        onPressed: _importFile,
-                        icon: const Icon(Icons.file_upload_outlined),
-                        label: const Text('นำเข้าข้อมูล'),
-                      ),
-                      // This button will only be visible in debug mode
-                      if (kDebugMode)
-                        TextButton.icon(
-                          onPressed: _seedData,
-                          icon: const Icon(Icons.data_exploration_outlined),
-                          label: const Text('ข้อมูลจำลอง'),
-                          style: TextButton.styleFrom(
-                              foregroundColor: Colors.purple),
-                        ),
-                    ],
                   ),
                 ],
               ),
@@ -351,17 +357,35 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
           ),
           Positioned(
             top: 40,
-            left: 16,
-            child: TextButton.icon(
-              onPressed: () {
-                Navigator.of(context).push(MaterialPageRoute(
-                    builder: (_) => const ManualMainScreen()));
-              },
-              icon: const Icon(Icons.help_outline),
-              label: const Text('คู่มือการใช้งาน'),
-              style: TextButton.styleFrom(
-                foregroundColor: Colors.white,
-                backgroundColor: Colors.black.withOpacity(0.4),
+            left: 0,
+            right: 0,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  TextButton.icon(
+                    onPressed: () {
+                      Navigator.of(context).push(MaterialPageRoute(
+                          builder: (_) => const ManualMainScreen()));
+                    },
+                    icon: const Icon(Icons.help_outline),
+                    label: const Text('คู่มือ'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: Colors.white,
+                      backgroundColor: Colors.black.withOpacity(0.4),
+                    ),
+                  ),
+                  TextButton.icon(
+                    onPressed: _seedData,
+                    icon: const Icon(Icons.data_exploration_outlined),
+                    label: const Text('ทดลองใช้งาน'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: Colors.black54,
+                      backgroundColor: Colors.purple.withOpacity(0),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),

@@ -26,7 +26,7 @@ class DatabaseSeeder {
     await SecureStorageService().deleteAll();
 
     // 2. Create Admin and Temple
-    const adminId1 = '9999';
+    const adminId1 = '9999'; // This ID is now shown to the user
     const defaultId2 = '1111'; // Default ID2 for all mock users for easy login
     final hashedDefaultId2 = _cryptoService.hashString(defaultId2);
 
