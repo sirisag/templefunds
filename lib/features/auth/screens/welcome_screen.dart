@@ -115,15 +115,11 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
     );
 
     if (confirmed == true && mounted) {
+      // Call the central reset logic in the provider.
       await ref.read(authProvider.notifier).resetApp();
-      // Invalidate all major data providers to force a full refresh
-      ref.invalidate(membersProvider);
-      ref.invalidate(transactionsProvider);
-      ref.invalidate(allAccountsProvider);
-      ref.invalidate(recoveryCodesProvider);
 
-      // After resetting, we should also check the DB status again to update the UI
-      await _checkDbStatus();
+      // After resetting, check the DB status again to update the UI.
+      // The UI will now correctly show that the database does not exist.
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -133,6 +129,7 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
           ),
         );
       }
+      await _checkDbStatus();
     }
   }
 
@@ -176,6 +173,10 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
       setState(() => _isLoading = true);
       try {
         await ref.read(databaseSeederProvider).seedDatabase();
+        // After seeding, invalidate the templeNameProvider to force it to
+        // re-fetch the new temple name from the newly created database.
+        ref.invalidate(templeNameProvider);
+
         await _checkDbStatus(); // Refresh UI
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
@@ -382,7 +383,7 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
                     label: const Text('ทดลองใช้งาน'),
                     style: TextButton.styleFrom(
                       foregroundColor: Colors.black54,
-                      backgroundColor: Colors.purple.withOpacity(0),
+                      backgroundColor: Colors.amber.withOpacity(0.1),
                     ),
                   ),
                 ],

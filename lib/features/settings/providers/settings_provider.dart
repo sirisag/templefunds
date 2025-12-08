@@ -163,9 +163,9 @@ class HomeStyleState {
 
   const HomeStyleState({
     this.imagePath,
-    this.cornerRadius = 30.0,
-    this.widthMultiplier = 0.8,
-    this.heightMultiplier = 0.5,
+    this.cornerRadius = 150.0, // <-- 1. แก้ไขค่าเริ่มต้นความโค้งที่นี่
+    this.widthMultiplier = 0.78, // <-- 2. แก้ไขค่าเริ่มต้นความกว้างที่นี่
+    this.heightMultiplier = 0.7, // <-- 3. แก้ไขค่าเริ่มต้นความสูงที่นี่
   });
 
   HomeStyleState copyWith({
@@ -192,11 +192,14 @@ class HomeStyleNotifier extends AsyncNotifier<HomeStyleState> {
   @override
   Future<HomeStyleState> build() async {
     final prefs = await SharedPreferences.getInstance();
+    const defaultStyle = HomeStyleState();
     return HomeStyleState(
       imagePath: prefs.getString(_pathKey),
-      cornerRadius: prefs.getDouble(_radiusKey) ?? 30.0,
-      widthMultiplier: prefs.getDouble(_widthKey) ?? 0.8,
-      heightMultiplier: prefs.getDouble(_heightKey) ?? 0.5,
+      cornerRadius: prefs.getDouble(_radiusKey) ?? defaultStyle.cornerRadius,
+      widthMultiplier:
+          prefs.getDouble(_widthKey) ?? defaultStyle.widthMultiplier,
+      heightMultiplier:
+          prefs.getDouble(_heightKey) ?? defaultStyle.heightMultiplier,
     );
   }
 

@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:archive/archive_io.dart';
 import 'package:flutter/foundation.dart';
 import 'dart:math';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/models/user_model.dart';
@@ -15,6 +16,8 @@ import '../../../core/database/database_helper.dart';
 import '../../../core/services/crypto_service.dart';
 import '../../transactions/providers/accounts_provider.dart';
 import '../../recovery/providers/recovery_codes_provider.dart';
+import '../../members/providers/members_provider.dart';
+import '../../transactions/providers/transactions_provider.dart';
 import '../../settings/providers/settings_provider.dart';
 
 // Part 1: Define the possible authentication states
@@ -552,11 +555,39 @@ class AuthNotifier extends Notifier<AuthState> {
 
   /// Resets the entire application to its initial state by deleting the database and PIN.
   Future<void> resetApp() async {
+    // 1. Delete all secure storage data (PIN, user ID, etc.)
     await _secureStorage.deleteAll();
+
+    // 2. Delete the database file
     await _dbHelper.deleteDatabaseFile();
+
+    // 3. Clear all SharedPreferences data (theme, custom images, font size, etc.)
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.clear();
+
+    // 4. Delete all user-generated files (images, logos, etc.)
+    // This ensures a complete reset by removing all files from the app's documents directory.
+    final appDocsDir = await getApplicationDocumentsDirectory();
+    if (await appDocsDir.exists()) {
+      // Delete the directory and all its contents, then recreate it empty.
+      await appDocsDir.delete(recursive: true);
+      await appDocsDir.create(recursive: true);
+    }
+
+    // 4. Reset the authentication state in memory
     state = AuthState(
       status: AuthStatus.loggedOut, // Reset to a clean loggedOut state
-    ); // Reset to a clean loggedOut state
+    );
+
+    // Invalidate all major data providers to force a full refresh across the app.
+    // This ensures that any cached data from the old database is cleared.
+    ref.invalidate(membersProvider);
+    ref.invalidate(transactionsProvider);
+    ref.invalidate(allAccountsProvider);
+    ref.invalidate(recoveryCodesProvider);
+    ref.invalidate(templeNameProvider);
+    ref.invalidate(homeStyleProvider);
+    ref.invalidate(backgroundStyleProvider);
   }
 
   /// Saves the timestamp of the last successful DB export.
