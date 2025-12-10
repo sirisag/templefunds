@@ -78,6 +78,24 @@ final filteredBalanceProvider =
       );
 });
 
+/// A record to hold the parameters for the balance up to date provider.
+typedef BalanceUpToDateFilter = ({int accountId, DateTime date});
+
+/// A provider to get the total balance for an account up to a specific date.
+final balanceUpToDateProvider =
+    Provider.autoDispose.family<double, BalanceUpToDateFilter>((ref, filter) {
+  return ref.watch(transactionsProvider).when(
+        data: (transactions) => transactions
+            .where((t) =>
+                t.accountId == filter.accountId &&
+                t.transactionDate.isBefore(filter.date))
+            .fold(0.0,
+                (sum, t) => sum + (t.type == 'income' ? t.amount : -t.amount)),
+        loading: () => 0.0, // Return 0 while loading
+        error: (e, s) => 0.0, // Return 0 on error
+      );
+});
+
 /// A record to hold the parameters for the audited transactions family provider.
 typedef AuditFilter = ({int accountId, int year});
 

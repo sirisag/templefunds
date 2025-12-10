@@ -178,7 +178,11 @@ class _TempleTransactionsScreenState
     final monthlyTransactionsAsync =
         ref.watch(monthlyTransactionsProvider(filter));
     final allUsersAsync = ref.watch(membersProvider);
-    final totalBalance = ref.watch(filteredBalanceProvider(templeAccount.id!));
+
+    // Calculate the end of the selected month to get the balance up to that point.
+    final endOfMonth = DateTime(_selectedMonth.year, _selectedMonth.month + 1);
+    final balanceFilter = (accountId: templeAccount.id!, date: endOfMonth);
+    final balanceAtMonthEnd = ref.watch(balanceUpToDateProvider(balanceFilter));
 
     // Handle combined loading/error states first
     if (monthlyTransactionsAsync.isLoading || allUsersAsync.isLoading) {
@@ -253,14 +257,14 @@ class _TempleTransactionsScreenState
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    'ยอดคงเหลือทั้งหมด:',
+                    'ยอดคงเหลือ ณ สิ้นเดือน:',
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                   Text(
-                    '฿${NumberFormat("#,##0").format(totalBalance)}',
+                    '฿${NumberFormat("#,##0").format(balanceAtMonthEnd)}',
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
                           fontWeight: FontWeight.bold,
-                          color: totalBalance >= 0
+                          color: balanceAtMonthEnd >= 0
                               ? Colors.blue.shade800
                               : Colors.orange.shade800,
                         ),
