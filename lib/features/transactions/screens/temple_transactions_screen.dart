@@ -16,29 +16,6 @@ import 'package:templefunds/features/settings/widgets/temple_avatar.dart';
 import 'package:templefunds/features/transactions/providers/transactions_provider.dart';
 import 'package:templefunds/features/transactions/screens/add_single_transaction_screen.dart';
 
-// A record to hold the parameters for the family provider
-typedef MonthlyFilter = ({int accountId, DateTime month});
-
-/// A provider that filters transactions for a specific account and a specific month.
-final monthlyTransactionsProvider = Provider.autoDispose
-    .family<AsyncValue<List<Transaction>>, MonthlyFilter>((ref, filter) {
-  final allTransactionsAsync = ref.watch(transactionsProvider);
-
-  return allTransactionsAsync.when(
-    data: (transactions) {
-      final filtered = transactions.where((t) {
-        final transactionDate = t.transactionDate.toLocal();
-        return t.accountId == filter.accountId &&
-            transactionDate.year == filter.month.year &&
-            transactionDate.month == filter.month.month;
-      }).toList();
-      return AsyncValue.data(filtered);
-    },
-    loading: () => const AsyncValue.loading(),
-    error: (err, stack) => AsyncValue.error(err, stack),
-  );
-});
-
 class TempleTransactionsScreen extends ConsumerStatefulWidget {
   const TempleTransactionsScreen({super.key});
 

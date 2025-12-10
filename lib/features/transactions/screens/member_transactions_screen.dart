@@ -14,7 +14,6 @@ import 'package:templefunds/features/transactions/providers/accounts_provider.da
 import 'package:templefunds/features/transactions/providers/transactions_provider.dart';
 import 'package:templefunds/features/transactions/screens/add_single_transaction_screen.dart';
 import 'package:templefunds/core/utils/date_formatter.dart';
-import 'package:templefunds/features/transactions/screens/temple_transactions_screen.dart';
 
 class MemberTransactionsScreen extends ConsumerStatefulWidget {
   final int userId;
